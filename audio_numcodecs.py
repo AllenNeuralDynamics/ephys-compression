@@ -17,13 +17,14 @@ compression procedure.
 
 """
 from pathlib import Path
-from math import gcd
 import numpy as np
 import subprocess
+import os 
 
 import numcodecs
 from numcodecs.abc import Codec
 from numcodecs.compat import ndarray_copy
+import time
 
 from utils import get_random_string
 
@@ -34,7 +35,7 @@ _max_channels_per_stream = {
     "flac": 2,
     "mp3": 2,
     "aac": 2,
-    "wavpack": 256 
+    "wavpack": 4096 
 }
 
 _format_to_ext = {
@@ -78,9 +79,9 @@ class FlacNumpyEncoder(_Encoder):
 
     Args:
         data (numpy.ndarray): the data to encode (n_samples x 2)
-        sample_rate (int): the sample rate
         output_file (pathlib.Path): Path to the output FLAC file, a temporary
             file will be created if unspecified.
+        sample_rate (int): the sample rate
         compression_level (int): The compression level parameter that
             varies from 0 (fastest) to 8 (slowest). The default setting
             is 5, see https://en.wikipedia.org/wiki/FLAC for more details.
@@ -175,6 +176,7 @@ class FlacNumpyDecoder(_Decoder):
 
         self.write_callback = self._write_callback
         self.total_samples = 0
+        self.decoded_data_list = []
         self.decoded_data = None
         
         c_input_filename = d_ffi.new('char[]', str(input_file).encode('utf-8'))
@@ -206,16 +208,14 @@ class FlacNumpyDecoder(_Decoder):
             raise DecoderProcessException(str(self.state))
 
         self.finish()
+        self.decoded_data = np.vstack(self.decoded_data_list)
 
 
     def _write_callback(self, data: np.ndarray, sample_rate: int, num_channels: int, num_samples: int):
         """
-        Internal callback to write the decoded data to a WAV file.
+        Internal callback to write the decoded data to a Numpy array file.
         """
-        if self.decoded_data is None:
-            self.decoded_data = data
-        else:
-            self.decoded_data = np.vstack((self.decoded_data, data))
+        self.decoded_data_list.append(data)
         self.total_samples += num_samples
 
 
@@ -283,6 +283,8 @@ class WavPackNumpyEncoder:
                  output_file,
                  sample_rate,
                  compression_mode="f",
+                 hybrid_factor=None,
+                 cc=False,
                  ):
         cformat = "wavpack"
         assert data.shape[1] <= _max_channels_per_stream[cformat]
@@ -291,6 +293,8 @@ class WavPackNumpyEncoder:
         self._sample_rate = sample_rate
         assert compression_mode in ["f", "h", "hh"]
         self._cmode = compression_mode
+        self._hybrid_factor = hybrid_factor
+        self._cc = cc
         self.total_bytes = 0
         
     def process(self):
@@ -301,7 +305,13 @@ class WavPackNumpyEncoder:
         wavfile.write(tmp_wav_file, int(self._sample_rate), self._data)    
         
         # print(f"Converting {self._output_file} - {self._lossless} - {self._hybrid_n}")
-        cmd = ["wavpack", "-y", "-i", "-d", f"-{self._cmode}", str(tmp_wav_file), "-o", str(self._output_file)]
+        cmd = ["wavpack", "-y", "-i", "-d", f"-{self._cmode}"]
+        
+        if self._hybrid_factor is not None:
+            cmd += [f"-b{self._hybrid_factor}"]
+            if self._cc:
+                cmd += ["-cc"]
+        cmd += [str(tmp_wav_file), "-o", str(self._output_file)]
         
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -320,14 +330,14 @@ class WavPackNumpyDecoder:
 
     def process(self):
         # convert to tmp wav file
-        tmp_wav_file = self._input_file.parent / f"tmp.wav"
+        tmp_wav_file = self._input_file.parent / f"tmp{get_random_string(10)}.wav"
 
         # print(f"Converting {self._input_file}")
         subprocess.run(["wvunpack", "-y", str(self._input_file), "-o", str(tmp_wav_file)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # load wav in memory
-        rate, data = wavfile.read(tmp_wav_file)
+        _, data = wavfile.read(tmp_wav_file)
         
         # rm tmp wav file
         tmp_wav_file.unlink()
@@ -355,7 +365,7 @@ _decoder_classes = {
 class BaseAudioCodec(Codec):    
     codec_id = ""
     
-    def __init__(self, cformat, tmp_folder=None, flatten=False, **kwargs):
+    def __init__(self, cformat, tmp_folder=None, **kwargs):
         if tmp_folder is None:
             tmp_folder = Path("tmp")
         else:
@@ -365,36 +375,42 @@ class BaseAudioCodec(Codec):
         self._format = cformat
         self._encoder_class = _encoder_classes[cformat]
         self._decoder_class = _decoder_classes[cformat]
-        self._flatten = flatten
         self._kwargs = kwargs
-        
-    def encode(self, buf):
+
+    def _prepare_data(self, buf):
         # checks
         assert len(buf.shape) <= _max_channels_per_stream[self._format]
         assert buf.dtype.kind in ["i", "u"]
         if buf.ndim == 1:
             data = buf[:, None]
         else:
-            nsamples, nchannels = buf.shape
+            _, nchannels = buf.shape
             
             if nchannels > _max_channels_per_stream[self._format]:
-                if self._flatten:
-                    data = buf.flatten()[:, None]    
-                else:
-                    # reshape C order with the GCD bewteen num channels and max channels
-                    nenc_channels = gcd(nchannels, _max_channels_per_stream[self._format])
-
-                    data = buf.reshape((int(nsamples * (nchannels // nenc_channels + np.mod(nchannels, nenc_channels))), 
-                                        nenc_channels), order="C")
+                data = buf.flatten()[:, None]    
             else:
-                data = buf        
+                data = buf   
+
+        return data
+
+    def _post_encode(self, tmp_file):
+        with tmp_file.open("rb") as f:
+            enc = f.read()
+        return enc  
+
+    def _pre_decode(self, buf, tmp_file):
+        with tmp_file.open("wb") as f:
+            f.write(buf) 
+
+    def encode(self, buf):
+        data = self._prepare_data(buf)
         
         tmp_file = self._tmp_folder / f"{get_random_string(RND_LEN)}{_format_to_ext[self._format]}"
         encoder = self._encoder_class(data, tmp_file, **self._kwargs)
         encoder.process()
+
+        enc = self._post_encode(tmp_file)
         
-        with tmp_file.open("rb") as f:
-            enc = f.read()
         # delete tmp file
         tmp_file.unlink()
         
@@ -403,13 +419,14 @@ class BaseAudioCodec(Codec):
     def decode(self, buf, out=None):        
         tmp_file = self._tmp_folder / f"{get_random_string(RND_LEN)}{_format_to_ext[self._format]}"
         
-        with tmp_file.open("wb") as f:
-            f.write(buf)
-            
+        self._pre_decode(buf, tmp_file)
+
         decoder = self._decoder_class(tmp_file)
         decoder.process()
-        
         dec = decoder.decoded_data
+        
+        # if isinstance(dec, list):
+        #     dec = np.vstack(dec)
         
         # handle output
         out = ndarray_copy(dec, out)
@@ -423,22 +440,21 @@ class BaseAudioCodec(Codec):
 class FlacCodec(BaseAudioCodec):
     """Codec for FLAC (Free Lossless Audio Codec).
     
-    The implementation uses [pyFlac]()
+    The implementation uses [pyFlac](https://github.com/sonos/pyFLAC).
+    If the block has more than 2 channels, the data is flattened before compression.
     
 
     Parameters
     ----------
-    tmp_folder : _type_, optional
-        _description_, by default None
-    flatten : bool, optional
-        _description_, by default False
+    tmp_folder : str or Path, optional
+        The folder where to save tmp flac files, by default None
     compression_level : int, optional
-        _description_, by default 5
+        The FLAC compression level (1-8), by default 5
     """
     codec_id = "flac"
     
-    def __init__(self, tmp_folder=None, flatten=False, compression_level=5):
-        BaseAudioCodec.__init__(self, "flac", tmp_folder=tmp_folder, flatten=flatten,
+    def __init__(self, compression_level=5, tmp_folder=None):
+        BaseAudioCodec.__init__(self, "flac", tmp_folder=tmp_folder,
                                 compression_level=compression_level, sample_rate=48000)
         self.compression_level = compression_level
         
@@ -447,7 +463,6 @@ class FlacCodec(BaseAudioCodec):
         return dict(
             id=self.codec_id,
             tmp_folder=str(self._tmp_folder),
-            flatten=self._flatten,
             compression_level=self.compression_level,
         )
 
@@ -455,21 +470,47 @@ numcodecs.register_codec(FlacCodec)
 
 
 class WavPackCodec(BaseAudioCodec):
+    """Codec for WavPack.
+    
+    The implementation uses the [WavPack binaries] command line interface to convart a tmp .wav file created
+    with scipy to wv. Similarly, at decompression the wv file is converted to a tmp wav file and then deleted.
+    
+    If the block has more than 1024 channels, the data is flattened before compression.
+
+
+    Parameters
+    ----------
+    tmp_folder : str or Path, optional
+        The folder where to save tmp flac files, by default None
+    compression_mode : str, optional
+        The WavPAck compression mode:
+        - "f": fast
+        - "h": high
+        - "hh": very high
+    hybrid_factor :  float, optional
+        If the hybrid factor is given, the hybrid mode is used and compression is lossy. The hybrid factor is between 
+        2 and 24 (it can be a decimal, e.g. 3.5) and it's the average number of bits used to encode each sample.
+    """
     
     codec_id = "wavpack"
     
-    def __init__(self, tmp_folder=None, flatten=True, lossless=True):
-        BaseAudioCodec.__init__(self, "wavpack", tmp_folder=tmp_folder, flatten=flatten,
-                                compression_mode="f", sample_rate=48000)
-        self.lossless = lossless    
+    def __init__(self, compression_mode="f", hybrid_factor=None, cc=False, tmp_folder=None):
+        BaseAudioCodec.__init__(self, "wavpack", tmp_folder=tmp_folder, 
+                                compression_mode=compression_mode, hybrid_factor=hybrid_factor, 
+                                cc=cc,
+                                sample_rate=48000)
+        self.compression_mode = compression_mode   
+        self.cc = cc 
+        self.hybrid_factor = hybrid_factor
         
     def get_config(self):
         # override to handle encoding dtypes
         return dict(
             id=self.codec_id,
             tmp_folder=str(self._tmp_folder),
-            flatten=self._flatten,
-            lossless=self.lossless
+            compression_mode=self.compression_mode,
+            cc=self.cc,
+            hybrid_factor=self.hybrid_factor
         )
 
 numcodecs.register_codec(WavPackCodec)

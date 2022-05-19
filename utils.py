@@ -4,6 +4,8 @@ from tqdm import tqdm
 import numpy as np
 import string
 import random
+import numcodecs
+import time
 
 import spikeinterface.full as si
 
@@ -26,6 +28,7 @@ def get_dir_size(path='.'):
                 total += get_dir_size(entry.path)
     return total
 
+
 def append_to_csv(df_file, new_data, subset_columns=None):
     new_df = None
     if df_file.is_file():
@@ -40,12 +43,17 @@ def append_to_csv(df_file, new_data, subset_columns=None):
         new_df = pd.DataFrame(new_data_arr)
     if new_df is not None:
         new_df.to_csv(df_file, index=False)
-        
+
+
 def is_entry(df_file, data, subset_columns=None):
     if df_file.is_file():
         df = pd.read_csv(df_file)
         if subset_columns is None:
             subset_columns = list(data.keys())
+            
+        if np.any([k not in df.columns for k in list(data.keys())]):
+            return False
+        
         query = ""
         data_keys = list(data.keys())
         query_idx = 0
@@ -107,3 +115,55 @@ def get_median_and_lsb(recording, num_random_chunks=10):
     print(f"LSB int16 {lsb_value} --> {lsb_value * gain} uV")
     
     return lsb_value, median_values
+
+
+def trunc_filter(bits, recording):
+    scale = 1.0 / (2 ** bits)
+    dtype = recording.get_dtype()
+    if bits == 0:
+        return []
+    else:
+        return [numcodecs.FixedScaleOffset(offset=0, scale=scale, dtype=dtype)]
+
+
+def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
+                          time_range=[10, 20], **job_kwargs):
+    fs = rec_to_compress.get_sampling_frequency()
+    print("compressing")
+    t_start = time.perf_counter()
+    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
+                                    compressor=compressor, filters=filters, 
+                                    **job_kwargs)
+    t_stop = time.perf_counter()
+    elapsed_time = np.round(t_stop - t_start, 2)
+    dur = rec_to_compress.get_num_samples() / fs
+    xRT = dur / elapsed_time
+    cr = np.round(rec_compressed.get_annotation("compression_ratio"), 2)
+
+    # rmse
+    print("computing rmse")
+    rec_gt_f = si.bandpass_filter(rec_to_compress)
+    rec_compressed_f = si.bandpass_filter(rec_compressed)
+    frames = np.array(time_range) * fs
+    frames = frames.astype(int)
+    
+    traces_gt = rec_gt_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
+    traces_zarr_f = rec_compressed_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
+
+    rmse = np.round(np.sqrt(((traces_zarr_f.ravel() - traces_gt.ravel()) ** 2).mean()), 3)
+
+    return cr, xRT, elapsed_time, rmse
+
+def prettify_axes(axs, label_fs=15):
+    if not isinstance(axs, (list, np.ndarray)):
+        axs = [axs]
+    
+    axs = np.array(axs).flatten()
+    
+    for ax in axs:
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)        
+        
+        ax.set_xlabel(ax.get_xlabel(), fontsize=label_fs)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=label_fs)     
+

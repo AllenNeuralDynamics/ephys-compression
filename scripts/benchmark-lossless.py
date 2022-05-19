@@ -11,11 +11,12 @@ from tqdm import tqdm
 import sys
 import os
 
-from numcodecs import Blosc, Delta, blosc
+from numcodecs import Blosc, Shuffle, blosc
+import numcodecs
 
 sys.path.append("..")
 
-from audiocompression import write_recording_audio, AudioRecordingExtractor
+from audio_numcodecs import FlacCodec, WavPackCodec
 from utils import get_dir_size, append_to_csv, is_entry
 
 overwrite = False
@@ -33,39 +34,58 @@ tmp_folder.mkdir(exist_ok=True, parents=True)
 rec_files = ["/home/alessio/Documents/data/allen/npix-open-ephys/595262_2022-02-21_15-18-07/Record Node 102", 
              "/home/alessio/Documents/data/allen/npix-open-ephys/618382_2022-03-31_14-27-03/Record Node 102"]
 
-shuffles_dict = {"no": Blosc.NOSHUFFLE, 
-                 "bit": Blosc.BITSHUFFLE, 
-                 "shuffle": Blosc.SHUFFLE}
-
 ## Define compressions
-zarr_compressors = ['lz4', 'lz4hc', 'zlib', 'zstd'] 
-audio_compressors = ['flac', 'wavpack'] # blosc.list_compressors()
-compressors = zarr_compressors + audio_compressors
-levels = [1, 5, 9]
+blosc_compressors = ['blosc-lz4', 'blosc-lz4hc', 'blosc-zlib', 'blosc-zstd'] 
+zarr_compressors = ['zstd', 'zlib', 'lz4', 'gzip']
+audio_compressors = ['flac', 'wavpack'] 
+compressors = blosc_compressors + zarr_compressors + audio_compressors
 
-levels_audio = {"flac": levels, "wavpack": [1]}
+# define levels
+levels = {
+    "blosc": {"low": 1, "medium": 5, "high": 9},
+    "zstd": {"low": 1, "medium": 11, "high": 22},
+    "zlib": {"low": 1, "medium": 5, "high": 9},
+    "lz4": {"low": 1, "medium": 5, "high": 9},
+    "gzip": {"low": 1, "medium": 5, "high": 9},
+    "flac": {"low": 1, "medium": 5, "high": 8},
+    "wavpack": {"low": "f", "medium": "h", "high": "hh"}
+}
 
+# define filters and shuffles
+blosc_shuffles_dict = {"no": Blosc.NOSHUFFLE, 
+                       "bit": Blosc.BITSHUFFLE, 
+                       "shuffle": Blosc.SHUFFLE}
+zarr_shuffles_dict = {"no": [], 
+                      "shuffle": [Shuffle(2)]} # int16 --> 2 bytes
+audio_shuffles_dict = {"no": []}
+
+# define chunk sizes
+channel_chunk_sizes = {"blosc": [-1], "zarr": [-1], "flac": [-1, 2], "wavpack": [-1]}
 chunk_durations = ["0.1s", "1s", "10s"]
-n_jobs = 10
+# skip_durations = {"flac": ["10s"]}  # skip 10s for now because FLAC is soooo slow!
+skip_durations = []
 
+# define job kwargs
+n_jobs = 10
 job_kwargs = {'n_jobs': n_jobs, "verbose": False, "progress_bar": True}
 
-num_compressors = len(compressors)
-num_shuffles = len(shuffles_dict)
-num_chunk_durations = len(chunk_durations)
-num_levels = len(levels)
+# define LSB correction options
 lsb_correction = [False, True]
-num_entries_zarr = num_compressors * num_levels * num_shuffles * num_chunk_durations
 
 print(f"Benchmarking compressors: {compressors}")
 
+blosc_folder = tmp_folder / "blosc"
 zarr_folder = tmp_folder / "zarr"
 audio_folder = tmp_folder / "audio"
 
-benchmark_file = data_folder / "results" / "benchmark-lossless-lsb.csv"
-print(benchmark_file)
+benchmark_file = data_folder / "results" / "benchmark-lossless.csv"
 
-subset_columns = ["compressor", "chunk_dur", "level", "shuffle", "lsb", "probe"]
+print(benchmark_file)
+if benchmark_file.is_file():
+    df = pd.read_csv(benchmark_file, index_col=False)
+    print(len(df))
+
+subset_columns = ["compressor", "compressor_type", "chunk_dur", "level", "shuffle", "lsb", "probe", "channel_chunk_size"]
 
 if overwrite:
     if benchmark_file.is_file():
@@ -74,6 +94,9 @@ if overwrite:
 for rec_file in rec_files:
     rec_file = Path(rec_file)
     try:
+        if blosc_folder.is_dir():
+            shutil.rmtree(blosc_folder)
+        blosc_folder.mkdir(parents=True)
         if zarr_folder.is_dir():
             shutil.rmtree(zarr_folder)
         zarr_folder.mkdir(parents=True)
@@ -153,157 +176,269 @@ for rec_file in rec_files:
 
     print(f"LSB int16 {lsb_value} --> {lsb_value * gain} uV")
 
-    # No ZARR filters
-    filters = []
-
     for cname in compressors:
         print(f"COMPRESSOR: {cname}")
-        if cname not in audio_compressors:
-            for level in levels:
-                for chunk_dur in chunk_durations:
-                    job_kwargs["chunk_duration"] = chunk_dur
-                    for shuffle_name, shuffle in shuffles_dict.items():
-                        for lsb in lsb_correction:
-                            print(f"compressor {cname} - level {level} chunk dur - {chunk_dur} "
-                                  f"shuffle {shuffle_name} - lsb {lsb}\n")
-                            entry_data = {"compressor": cname, "level": level, "chunk_dur": chunk_dur,
-                                          "shuffle": shuffle_name, "lsb": lsb, "probe": probe_name}
+        if cname in blosc_compressors:
+            levels_blosc = levels["blosc"]
+            channel_chunk_sizes_blosc = channel_chunk_sizes["blosc"]
+            for channel_chunk_size in channel_chunk_sizes_blosc:
+                for level in levels_blosc:
+                    for chunk_dur in chunk_durations:
+                        job_kwargs["chunk_duration"] = chunk_dur
+                        for shuffle_name, shuffle in blosc_shuffles_dict.items():
+                            for lsb in lsb_correction:
+                                print(f"\ncompressor {cname} - level {level} chunk dur - {chunk_dur} "
+                                      f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}")
+                                entry_data = {"compressor": cname, "compressor_type": "blosc", "level": level, 
+                                              "chunk_dur": chunk_dur, "shuffle": shuffle_name, "lsb": lsb, 
+                                              "probe": probe_name, "channel_chunk_size": channel_chunk_size}
 
+                                if not is_entry(benchmark_file, entry_data):
+                                    filters = []
+                                    blosc_cname = cname.split("-")[1]
+                                    compressor = Blosc(cname=blosc_cname, clevel=levels_blosc[level], shuffle=shuffle)
+                                    if lsb:
+                                        rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
+                                        rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
+                                    else:
+                                        rec_to_compress = rec
 
-                            if not is_entry(benchmark_file, entry_data):
+                                    zarr_path = zarr_folder / f'{rec_file.name}_{cname}_{shuffle_name}_{chunk_dur}_{level}_lsb{lsb}.zarr'
 
-                                compressor = Blosc(cname=cname, clevel=level, shuffle=shuffle)
-                                if lsb:
-                                    rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
-                                    rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
-                                else:
-                                    rec_to_compress = rec
+                                    if zarr_path.is_dir():
+                                        shutil.rmtree(zarr_path)
 
-                                zarr_path = zarr_folder / f'{rec_file.name}_{cname}_{shuffle_name}_{chunk_dur}_{level}_lsb{lsb}.zarr'
+                                    if channel_chunk_size == -1:
+                                        chan_size = None
+                                    else:
+                                        chan_size = channel_chunk_size
 
-                                if zarr_path.is_dir():
+                                    t_start = time.perf_counter()
+                                    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
+                                                                          compressor=compressor, filters=filters, 
+                                                                          channels_per_chunk=chan_size,
+                                                                          **job_kwargs)
+                                    t_stop = time.perf_counter()
+                                    compression_elapsed_time = np.round(t_stop - t_start, 2)
+                                    
+                                    xRT = dur / compression_elapsed_time
+                                    
+                                    # cr
+                                    cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
+                                                rec_compressed._root['traces_seg0'].nbytes_stored, 3)
+                                    
+                                    if lsb:
+                                        rec_to_decompress = si.scale(rec_compressed, gain=lsb_value, dtype="int16")
+                                        rec_to_decompress = si.scale(rec_to_decompress, offset=median_values, 
+                                                                     dtype="int16")
+                                    else:
+                                        rec_to_decompress = rec_compressed
+
+                                    # get traces 1s
+                                    t_start = time.perf_counter()
+                                    traces = rec_to_decompress.get_traces(start_frame=start_frame_1s, 
+                                                                          end_frame=end_frame_1s)
+                                    t_stop = time.perf_counter()
+                                    decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
+
+                                    # get traces 10s
+                                    t_start = time.perf_counter()
+                                    traces = rec_to_decompress.get_traces(start_frame=start_frame_10s, 
+                                                                          end_frame=end_frame_10s)
+                                    t_stop = time.perf_counter()
+                                    decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
+
+                                    # record entry
+                                    data = {"probe": probe_name, "num_channels": num_channels, 
+                                            "duration": dur, "dtype": dtype, "compressor": cname, 
+                                            "compressor_type": "blosc", "level": level,
+                                            "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
+                                            "CR": cr, "C-speed": compression_elapsed_time,
+                                            "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
+                                            "xRT": xRT, "channel_chunk_size": channel_chunk_size}
+                                    append_to_csv(benchmark_file, data, subset_columns=subset_columns)
+                                    print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
+                                          f"DC10s={decompression_10s_elapsed_time}s")
+                                    # remove tmp path
                                     shutil.rmtree(zarr_path)
-
-                                t_start = time.perf_counter()
-                                rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
-                                                                      compressor=compressor, filters=filters, 
-                                                                      **job_kwargs)
-                                t_stop = time.perf_counter()
-                                compression_elapsed_time = np.round(t_stop - t_start, 2)
-                                
-                                xRT = dur / compression_elapsed_time
-                                
-                                # cr
-                                cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
-                                              rec_compressed._root['traces_seg0'].nbytes_stored, 3)
-                                
-                                if lsb:
-                                    rec_to_decompress = si.scale(rec_compressed, gain=lsb_value, dtype="int16")
-                                    rec_to_decompress = si.scale(rec_to_decompress, offset=median_values, 
-                                                                 dtype="int16")
                                 else:
-                                    rec_to_decompress = rec_compressed
+                                    print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
+                                          f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
+                                          f"channel_chunk_size {channel_chunk_size} already present\n")
+        elif cname in zarr_compressors:
+            levels_zarr = levels[cname]
+            channel_chunk_sizes_zarr = channel_chunk_sizes["zarr"]
+            for channel_chunk_size in channel_chunk_sizes_zarr:
+                for level in levels_zarr:
+                    for chunk_dur in chunk_durations:
+                        job_kwargs["chunk_duration"] = chunk_dur
+                        for shuffle_name, filters in zarr_shuffles_dict.items():
+                            for lsb in lsb_correction:
+                                print(f"\ncompressor {cname} - level {level} chunk dur - {chunk_dur} "
+                                      f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}")
+                                entry_data = {"compressor": cname, "compressor_type": "numcodecs", "level": level, 
+                                              "chunk_dur": chunk_dur, "shuffle": shuffle_name, "lsb": lsb, 
+                                              "probe": probe_name, "channel_chunk_size": channel_chunk_size}
 
-                                # get traces 1s
-                                t_start = time.perf_counter()
-                                traces = rec_to_decompress.get_traces(start_frame=start_frame_1s, 
-                                                                      end_frame=end_frame_1s)
-                                t_stop = time.perf_counter()
-                                decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
+                                if not is_entry(benchmark_file, entry_data):
+                                    compressor = numcodecs.registry.codec_registry[cname](levels_zarr[level])
+                                    print(compressor, filters)
+                                    if lsb:
+                                        rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
+                                        rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
+                                    else:
+                                        rec_to_compress = rec
 
-                                # get traces 10s
-                                t_start = time.perf_counter()
-                                traces = rec_to_decompress.get_traces(start_frame=start_frame_10s, 
-                                                                      end_frame=end_frame_10s)
-                                t_stop = time.perf_counter()
-                                decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
+                                    zarr_path = zarr_folder / f'{rec_file.name}_{cname}_{shuffle_name}_{chunk_dur}_{level}_lsb{lsb}.zarr'
 
-                                # record entry
-                                data = {"probe": probe_name, "num_channels": num_channels, 
-                                        "duration": dur, "dtype": dtype, "compressor": cname, "level": level,
-                                        "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
-                                        "CR": cr, "C-speed": compression_elapsed_time,
-                                        "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
-                                        "xRT": xRT}
-                                append_to_csv(benchmark_file, data, subset_columns=subset_columns)
-                                print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
-                                      f"DC10s={decompression_10s_elapsed_time}s")
-                                # remove tmp path
-                                shutil.rmtree(zarr_path)
-                            else:
-                                print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
-                                      f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
-                                      f"already present\n")
+                                    if zarr_path.is_dir():
+                                        shutil.rmtree(zarr_path)
+
+                                    if channel_chunk_size == -1:
+                                        chan_size = None
+                                    else:
+                                        chan_size = channel_chunk_size
+
+                                    t_start = time.perf_counter()
+                                    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
+                                                                          compressor=compressor, filters=filters, 
+                                                                          channels_per_chunk=chan_size,
+                                                                          **job_kwargs)
+                                    t_stop = time.perf_counter()
+                                    compression_elapsed_time = np.round(t_stop - t_start, 2)
+                                    
+                                    xRT = dur / compression_elapsed_time
+                                    
+                                    # cr
+                                    cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
+                                                rec_compressed._root['traces_seg0'].nbytes_stored, 3)
+                                    
+                                    if lsb:
+                                        rec_to_decompress = si.scale(rec_compressed, gain=lsb_value, dtype="int16")
+                                        rec_to_decompress = si.scale(rec_to_decompress, offset=median_values, 
+                                                                     dtype="int16")
+                                    else:
+                                        rec_to_decompress = rec_compressed
+
+                                    # get traces 1s
+                                    t_start = time.perf_counter()
+                                    traces = rec_to_decompress.get_traces(start_frame=start_frame_1s, 
+                                                                        end_frame=end_frame_1s)
+                                    t_stop = time.perf_counter()
+                                    decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
+
+                                    # get traces 10s
+                                    t_start = time.perf_counter()
+                                    traces = rec_to_decompress.get_traces(start_frame=start_frame_10s, 
+                                                                        end_frame=end_frame_10s)
+                                    t_stop = time.perf_counter()
+                                    decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
+
+                                    # record entry
+                                    data = {"probe": probe_name, "num_channels": num_channels, 
+                                            "duration": dur, "dtype": dtype, "compressor": cname, 
+                                            "compressor_type": "numcodecs", "level": level,
+                                            "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
+                                            "CR": cr, "C-speed": compression_elapsed_time,
+                                            "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
+                                            "xRT": xRT, "channel_chunk_size": channel_chunk_size}
+                                    append_to_csv(benchmark_file, data, subset_columns=subset_columns)
+                                    print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
+                                          f"DC10s={decompression_10s_elapsed_time}s")
+                                    # remove tmp path
+                                    shutil.rmtree(zarr_path)
+                                else:
+                                    print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
+                                          f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
+                                          f"channel_chunk_size {channel_chunk_size} already present\n")
         else:
-            for level in levels_audio[cname]:
-                for chunk_dur in chunk_durations:
-                    job_kwargs["chunk_duration"] = chunk_dur
-                    for lsb in lsb_correction:
-                        shuffle_name = "no"
-                        print(f"compressor {cname} - level {level} chunk dur - {chunk_dur} "
-                              f"shuffle {shuffle_name} - lsb {lsb}\n")
-                        entry_data = {"compressor": cname, "level": level, "chunk_dur": chunk_dur,
-                                      "shuffle": shuffle_name, "lsb": lsb, "probe": probe_name}
+            # audio  
+            levels_audio = levels[cname]
+            channel_chunk_sizes_audio = channel_chunk_sizes[cname]
+            for channel_chunk_size in channel_chunk_sizes_audio:
+                for level in levels_audio:
+                    for chunk_dur in chunk_durations:        
+                        if cname in skip_durations:
+                            if chunk_dur in skip_durations[cname]:
+                                print(f"Skipping {chunk_dur} for {cname}")
+                                continue
+                        job_kwargs["chunk_duration"] = chunk_dur
+                        for shuffle_name, filters in audio_shuffles_dict.items():
+                            for lsb in lsb_correction:
+                                print(f"compressor {cname} - level {level} chunk dur - {chunk_dur} "
+                                      f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}\n")
+                                entry_data = {"compressor": cname, "compressor_type": "audio", "level": level, 
+                                              "chunk_dur": chunk_dur, "shuffle": shuffle_name, "lsb": lsb, 
+                                              "probe": probe_name, "channel_chunk_size": channel_chunk_size}
 
-                        if not is_entry(benchmark_file, entry_data):
-                            if lsb:
-                                rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
-                                rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
-                            else:
-                                rec_to_compress = rec
+                                if not is_entry(benchmark_file, entry_data):
+                                    level_compressor = levels_audio[level]
+                                    compressor = numcodecs.registry.codec_registry[cname](level_compressor)
+                                    print(compressor, filters)
+                                        
+                                    if lsb:
+                                        rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
+                                        rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
+                                    else:
+                                        rec_to_compress = rec
 
-                            output_folder = audio_folder / f'{rec_file.name}_{cname}_{shuffle_name}_{chunk_dur}_{level}_lsb-{lsb}'
+                                    zarr_path = zarr_folder / f'{rec_file.name}_{cname}_{shuffle_name}_{chunk_dur}_{level}_lsb{lsb}_chans{channel_chunk_size}.zarr'
+                                    if zarr_path.is_dir():
+                                        shutil.rmtree(zarr_path)
 
-                            if output_folder.is_dir():
-                                shutil.rmtree(output_folder)
+                                    if channel_chunk_size == -1:
+                                        chan_size = None
+                                    else:
+                                        chan_size = channel_chunk_size
 
-                            t_start = time.perf_counter()
-                            rec_compressed = write_recording_audio(rec_to_compress, cformat=cname, 
-                                                                   output_folder=output_folder,
-                                                                   compression_level=np.min([level, 8]), 
-                                                                   **job_kwargs)
-                            t_stop = time.perf_counter()
-                            compression_elapsed_time = np.round(t_stop - t_start, 2)
-                            
-                            xRT = dur / compression_elapsed_time
-                            
-                            # cr
-                            cr = np.round(full_size / get_dir_size(output_folder), 3)
+                                    t_start = time.perf_counter()
+                                    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
+                                                                          compressor=compressor, filters=filters, 
+                                                                          channels_per_chunk=chan_size,
+                                                                          **job_kwargs)
+                                    t_stop = time.perf_counter()
+                                    compression_elapsed_time = np.round(t_stop - t_start, 2)
+                                    
+                                    xRT = dur / compression_elapsed_time
+                                    
+                                    # cr
+                                    cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
+                                                rec_compressed._root['traces_seg0'].nbytes_stored, 3)
+                                    
+                                    if lsb:
+                                        rec_to_decompress = si.scale(rec_compressed, gain=lsb_value, dtype="int16")
+                                        rec_to_decompress = si.scale(rec_to_decompress, offset=median_values, 
+                                                                    dtype="int16")
+                                    else:
+                                        rec_to_decompress = rec_compressed
 
-                            if lsb:
-                                rec_to_decompress = si.scale(rec_compressed, gain=lsb_value, dtype="int16")
-                                rec_to_decompress = si.scale(rec_to_decompress, offset=median_values, 
-                                                                dtype="int16")
-                            else:
-                                rec_to_decompress = rec_compressed
+                                    # get traces 1s
+                                    t_start = time.perf_counter()
+                                    traces = rec_to_decompress.get_traces(start_frame=start_frame_1s, 
+                                                                            end_frame=end_frame_1s)
+                                    t_stop = time.perf_counter()
+                                    decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
 
-                            # get traces 1s
-                            t_start = time.perf_counter()
-                            traces = rec_to_decompress.get_traces(start_frame=start_frame_1s, 
-                                                                    end_frame=end_frame_1s)
-                            t_stop = time.perf_counter()
-                            decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
+                                    # get traces 10s
+                                    t_start = time.perf_counter()
+                                    traces = rec_to_decompress.get_traces(start_frame=start_frame_10s, 
+                                                                            end_frame=end_frame_10s)
+                                    t_stop = time.perf_counter()
+                                    decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
 
-                            # get traces 10s
-                            t_start = time.perf_counter()
-                            traces = rec_to_decompress.get_traces(start_frame=start_frame_10s, 
-                                                                    end_frame=end_frame_10s)
-                            t_stop = time.perf_counter()
-                            decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
-
-                            # record entry
-                            data = {"probe": probe_name, "num_channels": num_channels,
-                                    "duration": dur, "dtype": dtype, "compressor": cname, "level": level,
-                                    "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
-                                    "CR": cr, "C-speed": compression_elapsed_time,
-                                    "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
-                                    "xRT": xRT}
-                            append_to_csv(benchmark_file, data, subset_columns=subset_columns)
-                            print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
-                                    f"DC10s={decompression_10s_elapsed_time}s")
-                            # remove tmp path
-                            shutil.rmtree(output_folder)
-                        else:
-                            print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
-                                  f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
-                                  f"already present\n")
+                                    # record entry
+                                    data = {"probe": probe_name, "num_channels": num_channels,
+                                            "duration": dur, "dtype": dtype, "compressor": cname, "level": level,
+                                            "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
+                                            "CR": cr, "C-speed": compression_elapsed_time, "compressor_type": "audio",
+                                            "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
+                                            "xRT": xRT, "channel_chunk_size": channel_chunk_size}
+                                    append_to_csv(benchmark_file, data, subset_columns=subset_columns)
+                                    print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
+                                          f"DC10s={decompression_10s_elapsed_time}s")
+                                    # remove tmp path
+                                    shutil.rmtree(zarr_path)
+                                else:
+                                    print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
+                                        f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
+                                        f"channel_chunk_size {channel_chunk_size} already present\n")
