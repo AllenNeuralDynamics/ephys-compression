@@ -67,7 +67,7 @@ def is_entry(df_file, data, subset_columns=None):
                 if query_idx < len(subset_columns) - 1:
                     query += " and "
                 query_idx += 1
-        
+                
         if len(df.query(query)) == 0:
             return False
         else:
@@ -77,6 +77,22 @@ def is_entry(df_file, data, subset_columns=None):
     
     
 def get_median_and_lsb(recording, num_random_chunks=10):
+    """
+    Compute lsb and median from a regording
+
+    Parameters
+    ----------
+    recording : BaseRecording
+
+    num_random_chunks : int
+
+    Returns
+    -------
+    int
+        lsb value
+    np.arrahy
+        median values for each channel
+    """
     # compute lsb and median
     # gather chunks
     chunks = None
@@ -127,13 +143,14 @@ def trunc_filter(bits, recording):
 
 
 def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
-                          time_range=[10, 20], **job_kwargs):
+                          time_range=[10, 20], channel_chunk_size=-1, **job_kwargs):
     fs = rec_to_compress.get_sampling_frequency()
     print("compressing")
     t_start = time.perf_counter()
     rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
-                                    compressor=compressor, filters=filters, 
-                                    **job_kwargs)
+                                          compressor=compressor, filters=filters, 
+                                          channel_chunk_size=channel_chunk_size,
+                                          **job_kwargs)
     t_stop = time.perf_counter()
     elapsed_time = np.round(t_stop - t_start, 2)
     dur = rec_to_compress.get_num_samples() / fs
@@ -152,7 +169,7 @@ def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
 
     rmse = np.round(np.sqrt(((traces_zarr_f.ravel() - traces_gt.ravel()) ** 2).mean()), 3)
 
-    return cr, xRT, elapsed_time, rmse
+    return rec_compressed, cr, xRT, elapsed_time, rmse
 
 def prettify_axes(axs, label_fs=15):
     if not isinstance(axs, (list, np.ndarray)):
