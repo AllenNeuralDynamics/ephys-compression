@@ -6,6 +6,7 @@ import string
 import random
 import numcodecs
 import time
+import neo
 
 import spikeinterface.full as si
 
@@ -184,3 +185,90 @@ def prettify_axes(axs, label_fs=15):
         ax.set_xlabel(ax.get_xlabel(), fontsize=label_fs)
         ax.set_ylabel(ax.get_ylabel(), fontsize=label_fs)     
 
+
+#### CLOUD ###
+
+def get_s3_client(region_name):
+    bc = boto3.client('s3', config=Config(signature_version=UNSIGNED), region_name=region_name)
+    return bc
+
+
+def s3_download_public_file(object, destination, bucket, region_name):
+    """
+    downloads file from public bucket
+    :param object: relative path of file" 'atlas/dorsal_cortex_50.nrrd'
+    :param destination: full file path on local machine '/usr/ibl/dorsal_cortex_50.nrrd'
+    :param bucket: if not specified, 'ibl-brain-wide-map-public'
+    :return:
+    """
+    destination = Path(destination)
+    boto_client = get_s3_client(region_name)
+    destination.mkdir(parents=True, exist_ok=True)
+    object_name = object.split("/")[-1]
+    boto_client.download_file(bucket, object, str(destination / object_name))
+
+
+def s3_download_public_folder(remote_folder, destination, bucket, region_name, skip_patterns=None,
+                              overwrite=False, verbose=True):
+    """
+    downloads a public folder content to a local folder
+    :param prefix: relative path within the bucket, for example: 'spikesorting/benchmark'
+    :param destination: local folder path
+    :param bucket: if not specified, 'ibl-brain-wide-map-public'
+    :param boto_client: if not specified, will instantiate one in anonymous mode
+    :return:
+    """
+    boto_client = get_s3_client(region_name)
+    response = boto_client.list_objects_v2(Prefix=remote_folder, Bucket=bucket)
+
+    if skip_patterns is not None:
+        if isinstance(skip_patterns, str):
+            skip_patterns = [skip_patterns]
+
+    for item in response.get('Contents', []):
+        object = item['Key']
+        if object.endswith('/') and item['Size'] == 0:  # skips  folder
+            continue
+        local_file_path = Path(destination).joinpath(Path(object).relative_to(remote_folder))
+        local_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        skip = False
+        if any(sp in object for sp in skip_patterns):
+            skip = True
+
+        if not overwrite and local_file_path.exists() and local_file_path.stat().st_size == item['Size'] or skip:
+            if verbose:
+                print(f"skipping {local_file_path}")
+        else:
+            if verbose:
+                print(f"downloading {local_file_path}")
+            boto_client.download_file(bucket, object, str(local_file_path))
+
+# GCS
+def gs_download_folder(bucket, remote_folder, destination):
+    dst = Path(destination)
+    if not dst.is_dir():
+        dst.mkdir()
+
+    if not bucket.endswith("/"):
+        bucket += "/"
+    src = f"{bucket}{remote_folder}"
+
+    os.system(f"gsutil -m cp -r {src} {dst}")
+
+
+def gs_upload_folder(bucket, remote_folder, local_folder):
+    if not bucket.endswith("/"):
+        bucket += "/"
+    dst = f"{bucket}{remote_folder}"
+
+    os.system(f"gsutil -m rsync -r {local_folder} {dst}")
+
+
+def get_oe_stream(oe_folder):
+    # we have to first access the different streams (i.e., different probes)
+    io = neo.rawio.OpenEphysBinaryRawIO(oe_folder)
+    io._parse_header()
+    streams = io.header['signal_streams']
+
+    return streams
