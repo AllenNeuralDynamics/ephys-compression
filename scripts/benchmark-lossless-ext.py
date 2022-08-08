@@ -17,8 +17,8 @@ import numcodecs
 sys.path.append("..")
 
 from audio_numcodecs import FlacCodec
-from wavpack_cython import WavPack
-from utils import append_to_csv, is_entry, get_median_and_lsb, benchmark_compression
+from utils import append_to_csv, is_entry, get_median_and_lsb, benchmark_compression, \
+    get_oe_stream, gs_download_folder, gs_upload_folder, s3_download_public_file, s3_download_public_folder
 
 overwrite = False
 
@@ -251,11 +251,11 @@ for rec_dset, rec_folders in rec_dsets.items():
                             for shuffle_name, filters in zarr_shuffles_dict.items():
                                 for lsb in lsb_correction:
                                     print(f"\ncompressor {cname} - level {level} chunk dur - {chunk_dur} "
-                                        f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}")
+                                          f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}")
                                     entry_data = {"session": session, "dataset": rec_dset,
-                                                 "compressor": cname, "compressor_type": "numcodecs", "level": level, 
-                                                 "chunk_duration": chunk_dur, "shuffle": shuffle_name, "lsb": lsb, 
-                                                 "probe": probe_name, "channel_chunk_size": channel_chunk_size}
+                                                  "compressor": cname, "compressor_type": "numcodecs", "level": level, 
+                                                  "chunk_duration": chunk_dur, "shuffle": shuffle_name, "lsb": lsb, 
+                                                  "probe": probe_name, "channel_chunk_size": channel_chunk_size}
 
                                     if not is_entry(benchmark_file, entry_data):
                                         if cname != "lzma":
@@ -335,13 +335,13 @@ for rec_dset, rec_folders in rec_dsets.items():
                                                 "channel_chunk_size": channel_chunk_size}
                                         append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                         print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
-                                            f"DC10s={decompression_10s_elapsed_time}s")
+                                              f"DC10s={decompression_10s_elapsed_time}s")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
                                     else:
-                                        print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
-                                            f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
-                                            f"channel_chunk_size {channel_chunk_size} already present\n")
+                                        print(f"Entry for {rec_dset}/{session} with compressor {cname} - level {level} "
+                                              f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
+                                              f"channel_chunk_size {channel_chunk_size} already present\n")
             else:
                 # audio  
                 levels_audio = levels[cname]
@@ -438,10 +438,10 @@ for rec_dset, rec_folders in rec_dsets.items():
                                                 "channel_chunk_size": channel_chunk_size}
                                         append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                         print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
-                                            f"DC10s={decompression_10s_elapsed_time}s")
+                                              f"DC10s={decompression_10s_elapsed_time}s")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
                                     else:
-                                        print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
+                                        print(f"Entry for {rec_dset}/{session} with compressor {cname} - level {level} "
                                               f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
                                               f"channel_chunk_size {channel_chunk_size} already present\n")

@@ -17,7 +17,7 @@ import numcodecs
 sys.path.append("..")
 
 from audio_numcodecs import FlacCodec, WavPackCodec
-from utils import get_dir_size, append_to_csv, is_entry
+from utils import get_dir_size, append_to_csv, is_entry, get_median_and_lsb, benchmark_compression
 
 overwrite = False
 
@@ -36,7 +36,7 @@ rec_files = ["/home/alessio/Documents/data/allen/npix-open-ephys/595262_2022-02-
 
 ## Define compressions
 blosc_compressors = ['blosc-lz4', 'blosc-lz4hc', 'blosc-zlib', 'blosc-zstd'] 
-zarr_compressors = ['zstd', 'zlib', 'lz4', 'gzip']
+zarr_compressors = ['zstd', 'zlib', 'lz4', 'gzip', 'lzma']
 audio_compressors = ['flac', 'wavpack'] 
 compressors = blosc_compressors + zarr_compressors + audio_compressors
 
@@ -47,6 +47,7 @@ levels = {
     "zlib": {"low": 1, "medium": 5, "high": 9},
     "lz4": {"low": 1, "medium": 5, "high": 9},
     "gzip": {"low": 1, "medium": 5, "high": 9},
+    "lzma": {"low": 1, "medium": 5, "high": 9},
     "flac": {"low": 1, "medium": 5, "high": 8},
     "wavpack": {"low": "f", "medium": "h", "high": "hh"}
 }
@@ -154,28 +155,8 @@ for rec_file in rec_files:
     gain = rec.get_channel_gains()[0]
     dtype = rec.get_dtype()
 
-    channel_idxs = np.arange(num_channels)
-    min_values = np.zeros(num_channels, dtype=dtype)
-    median_values = np.zeros(num_channels, dtype=dtype)
-    offsets = np.zeros(num_channels, dtype=dtype)
-
-    for ch in tqdm(channel_idxs, desc="Estimating channel stats"):
-        unique_vals = np.unique(chunks[:, ch])
-        unique_vals_abs = np.abs(unique_vals)
-        lsb_val = np.min(np.diff(unique_vals))
-        
-        min_values[ch] = np.min(unique_vals_abs)
-        median_values[ch] = np.median(chunks[:, ch]).astype(dtype)
-        
-        unique_vals_m = np.unique(chunks[:, ch] - median_values[ch])
-        unique_vals_abs_m = np.abs(unique_vals_m)
-        offsets[ch] = np.min(unique_vals_abs_m)
-        
-        if lsb_val > lsb_value:
-            lsb_value = lsb_val
-
-    print(f"LSB int16 {lsb_value} --> {lsb_value * gain} uV")
-
+    rec_lsb = None
+    
     for cname in compressors:
         print(f"COMPRESSOR: {cname}")
         if cname in blosc_compressors:
@@ -198,8 +179,15 @@ for rec_file in rec_files:
                                     blosc_cname = cname.split("-")[1]
                                     compressor = Blosc(cname=blosc_cname, clevel=levels_blosc[level], shuffle=shuffle)
                                     if lsb:
-                                        rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
-                                        rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
+                                        if rec_lsb is None:
+                                            # compute rec to compress if needed
+                                            lsb_value, median_values = get_median_and_lsb(rec)
+
+                                            # median and LSB correction 
+                                            rec_lsb = si.scale(rec, gain=1., offset=-median_values, dtype=dtype)
+                                            rec_lsb = si.scale(rec_lsb, gain=1. / lsb_value, dtype=dtype)
+                                            rec_lsb.set_channel_gains(rec_lsb.get_channel_gains()*lsb_value)
+                                        rec_to_compress = rec_lsb
                                     else:
                                         rec_to_compress = rec
 
@@ -221,11 +209,11 @@ for rec_file in rec_files:
                                     t_stop = time.perf_counter()
                                     compression_elapsed_time = np.round(t_stop - t_start, 2)
                                     
-                                    xRT = dur / compression_elapsed_time
+                                    cspeed_xrt = dur / compression_elapsed_time
                                     
                                     # cr
                                     cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
-                                                rec_compressed._root['traces_seg0'].nbytes_stored, 3)
+                                                  rec_compressed._root['traces_seg0'].nbytes_stored, 3)
                                     
                                     if lsb:
                                         rec_to_decompress = si.scale(rec_compressed, gain=lsb_value, dtype="int16")
@@ -248,14 +236,18 @@ for rec_file in rec_files:
                                     t_stop = time.perf_counter()
                                     decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
 
+                                    decompression_10s_rt = 10. / decompression_10s_elapsed_time
+                                    decompression_1s_rt = 1. / decompression_1s_elapsed_time
+
                                     # record entry
-                                    data = {"probe": probe_name, "num_channels": num_channels, 
-                                            "duration": dur, "dtype": dtype, "compressor": cname, 
-                                            "compressor_type": "blosc", "level": level,
+                                    data = {"probe": probe_name, "num_channels": num_channels,
+                                            "duration": dur, "dtype": dtype, "compressor": cname, "level": level,
                                             "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
-                                            "CR": cr, "C-speed": compression_elapsed_time,
+                                            "CR": cr, "C-speed": compression_elapsed_time, "compressor_type": "audio",
                                             "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
-                                            "xRT": xRT, "channel_chunk_size": channel_chunk_size}
+                                            "cspeed_xrt": cspeed_xrt, "dspeed10s_xrt": decompression_10s_rt,
+                                            "dspeed1s_xrt": decompression_1s_rt,
+                                            "channel_chunk_size": channel_chunk_size}
                                     append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                     print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
                                           f"DC10s={decompression_10s_elapsed_time}s")
@@ -281,11 +273,20 @@ for rec_file in rec_files:
                                               "probe": probe_name, "channel_chunk_size": channel_chunk_size}
 
                                 if not is_entry(benchmark_file, entry_data):
-                                    compressor = numcodecs.registry.codec_registry[cname](levels_zarr[level])
-                                    print(compressor, filters)
+                                    if cname != "lzma":
+                                        compressor = numcodecs.registry.codec_registry[cname](levels_zarr[level])
+                                    else:
+                                        compressor = numcodecs.registry.codec_registry[cname](preset=levels_zarr[level])
                                     if lsb:
-                                        rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
-                                        rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
+                                        if rec_lsb is None:
+                                            # compute rec to compress if needed
+                                            lsb_value, median_values = get_median_and_lsb(rec)
+
+                                            # median and LSB correction 
+                                            rec_lsb = si.scale(rec, gain=1., offset=-median_values, dtype=dtype)
+                                            rec_lsb = si.scale(rec_lsb, gain=1. / lsb_value, dtype=dtype)
+                                            rec_lsb.set_channel_gains(rec_lsb.get_channel_gains()*lsb_value)
+                                        rec_to_compress = rec_lsb
                                     else:
                                         rec_to_compress = rec
 
@@ -307,7 +308,7 @@ for rec_file in rec_files:
                                     t_stop = time.perf_counter()
                                     compression_elapsed_time = np.round(t_stop - t_start, 2)
                                     
-                                    xRT = dur / compression_elapsed_time
+                                    cspeed_xrt = dur / compression_elapsed_time
                                     
                                     # cr
                                     cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
@@ -334,14 +335,18 @@ for rec_file in rec_files:
                                     t_stop = time.perf_counter()
                                     decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
 
+                                    decompression_10s_rt = 10. / decompression_10s_elapsed_time
+                                    decompression_1s_rt = 1. / decompression_1s_elapsed_time
+
                                     # record entry
-                                    data = {"probe": probe_name, "num_channels": num_channels, 
-                                            "duration": dur, "dtype": dtype, "compressor": cname, 
-                                            "compressor_type": "numcodecs", "level": level,
+                                    data = {"probe": probe_name, "num_channels": num_channels,
+                                            "duration": dur, "dtype": dtype, "compressor": cname, "level": level,
                                             "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
-                                            "CR": cr, "C-speed": compression_elapsed_time,
+                                            "CR": cr, "C-speed": compression_elapsed_time, "compressor_type": "audio",
                                             "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
-                                            "xRT": xRT, "channel_chunk_size": channel_chunk_size}
+                                            "cspeed_xrt": cspeed_xrt, "dspeed10s_xrt": decompression_10s_rt,
+                                            "dspeed1s_xrt": decompression_1s_rt,
+                                            "channel_chunk_size": channel_chunk_size}
                                     append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                     print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
                                           f"DC10s={decompression_10s_elapsed_time}s")
@@ -374,11 +379,16 @@ for rec_file in rec_files:
                                 if not is_entry(benchmark_file, entry_data):
                                     level_compressor = levels_audio[level]
                                     compressor = numcodecs.registry.codec_registry[cname](level_compressor)
-                                    print(compressor, filters)
-                                        
                                     if lsb:
-                                        rec_to_compress = si.scale(rec, gain=1., offset=-median_values, dtype="int16")
-                                        rec_to_compress = si.scale(rec_to_compress, gain=1. / lsb_value, dtype="int16")
+                                        if rec_lsb is None:
+                                            # compute rec to compress if needed
+                                            lsb_value, median_values = get_median_and_lsb(rec)
+
+                                            # median and LSB correction 
+                                            rec_lsb = si.scale(rec, gain=1., offset=-median_values, dtype=dtype)
+                                            rec_lsb = si.scale(rec_lsb, gain=1. / lsb_value, dtype=dtype)
+                                            rec_lsb.set_channel_gains(rec_lsb.get_channel_gains()*lsb_value)
+                                        rec_to_compress = rec_lsb
                                     else:
                                         rec_to_compress = rec
 
@@ -394,12 +404,12 @@ for rec_file in rec_files:
                                     t_start = time.perf_counter()
                                     rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
                                                                           compressor=compressor, filters=filters, 
-                                                                          channels_per_chunk=chan_size,
+                                                                          channel_chunk_size=chan_size,
                                                                           **job_kwargs)
                                     t_stop = time.perf_counter()
                                     compression_elapsed_time = np.round(t_stop - t_start, 2)
                                     
-                                    xRT = dur / compression_elapsed_time
+                                    cspeed_xrt = dur / compression_elapsed_time
                                     
                                     # cr
                                     cr = np.round(rec_compressed._root['traces_seg0'].nbytes / 
@@ -425,6 +435,9 @@ for rec_file in rec_files:
                                                                             end_frame=end_frame_10s)
                                     t_stop = time.perf_counter()
                                     decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
+                                    
+                                    decompression_10s_rt = 10. / decompression_10s_elapsed_time
+                                    decompression_1s_rt = 1. / decompression_1s_elapsed_time
 
                                     # record entry
                                     data = {"probe": probe_name, "num_channels": num_channels,
@@ -432,7 +445,9 @@ for rec_file in rec_files:
                                             "shuffle": shuffle_name, "lsb": lsb, "chunk_dur": chunk_dur,
                                             "CR": cr, "C-speed": compression_elapsed_time, "compressor_type": "audio",
                                             "D-1s": decompression_1s_elapsed_time, "D-10s": decompression_10s_elapsed_time,
-                                            "xRT": xRT, "channel_chunk_size": channel_chunk_size}
+                                            "cspeed_xrt": cspeed_xrt, "dspeed10s_xrt": decompression_10s_rt,
+                                            "dspeed1s_xrt": decompression_1s_rt,
+                                            "channel_chunk_size": channel_chunk_size}
                                     append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                     print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
                                           f"DC10s={decompression_10s_elapsed_time}s")
