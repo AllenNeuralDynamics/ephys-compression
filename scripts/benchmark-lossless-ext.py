@@ -1,8 +1,5 @@
 # Benchmark compression strategies
 import gcsfs
-from utils import append_to_csv, is_entry, get_median_and_lsb, benchmark_compression, \
-    get_oe_stream, gs_download_folder, gs_upload_folder, s3_download_public_file, s3_download_public_folder
-from audio_numcodecs import FlacCodec
 import spikeinterface.full as si
 import probeinterface as pi
 
@@ -20,6 +17,10 @@ import numcodecs
 
 sys.path.append("..")
 
+from utils import append_to_csv, is_entry, get_median_and_lsb, benchmark_compression, \
+    get_oe_stream, gs_download_folder, gs_upload_folder, s3_download_public_file, s3_download_public_folder
+from flac_numcodecs import Flac
+from wavpack_numcodecs import WavPack
 
 overwrite = False
 
