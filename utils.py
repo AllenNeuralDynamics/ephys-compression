@@ -9,6 +9,7 @@ import time
 import neo
 
 import spikeinterface.full as si
+from pathlib import Path
 
 
 def get_random_string(length):
@@ -51,10 +52,10 @@ def is_entry(df_file, data, subset_columns=None):
         df = pd.read_csv(df_file)
         if subset_columns is None:
             subset_columns = list(data.keys())
-            
+
         if np.any([k not in df.columns for k in list(data.keys())]):
             return False
-        
+
         query = ""
         data_keys = list(data.keys())
         query_idx = 0
@@ -68,15 +69,15 @@ def is_entry(df_file, data, subset_columns=None):
                 if query_idx < len(subset_columns) - 1:
                     query += " and "
                 query_idx += 1
-                
+
         if len(df.query(query)) == 0:
             return False
         else:
             return True
     else:
         return False
-    
-    
+
+
 def get_median_and_lsb(recording, num_random_chunks=10):
     """
     Compute lsb and median from a regording
@@ -103,8 +104,8 @@ def get_median_and_lsb(recording, num_random_chunks=10):
             chunks = chunks_i2
         else:
             chunks = np.vstack((chunks, chunks_i2))
-    
-    lsb_value = 0 
+
+    lsb_value = 0
     num_channels = recording.get_num_channels()
     gain = recording.get_channel_gains()[0]
     dtype = recording.get_dtype()
@@ -118,19 +119,19 @@ def get_median_and_lsb(recording, num_random_chunks=10):
         unique_vals = np.unique(chunks[:, ch])
         unique_vals_abs = np.abs(unique_vals)
         lsb_val = np.min(np.diff(unique_vals))
-        
+
         min_values[ch] = np.min(unique_vals_abs)
         median_values[ch] = np.median(chunks[:, ch]).astype(dtype)
-        
+
         unique_vals_m = np.unique(chunks[:, ch] - median_values[ch])
         unique_vals_abs_m = np.abs(unique_vals_m)
         offsets[ch] = np.min(unique_vals_abs_m)
-        
+
         if lsb_val > lsb_value:
             lsb_value = lsb_val
 
     print(f"LSB int16 {lsb_value} --> {lsb_value * gain} uV")
-    
+
     return lsb_value, median_values
 
 
@@ -148,8 +149,8 @@ def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
     fs = rec_to_compress.get_sampling_frequency()
     print("compressing")
     t_start = time.perf_counter()
-    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
-                                          compressor=compressor, filters=filters, 
+    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path,
+                                          compressor=compressor, filters=filters,
                                           channel_chunk_size=channel_chunk_size,
                                           **job_kwargs)
     t_stop = time.perf_counter()
@@ -164,7 +165,7 @@ def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
     rec_compressed_f = si.bandpass_filter(rec_compressed)
     frames = np.array(time_range) * fs
     frames = frames.astype(int)
-    
+
     traces_gt = rec_gt_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
     traces_zarr_f = rec_compressed_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
 
@@ -172,23 +173,28 @@ def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
 
     return rec_compressed, cr, xRT, elapsed_time, rmse
 
+
 def prettify_axes(axs, label_fs=15):
     if not isinstance(axs, (list, np.ndarray)):
         axs = [axs]
-    
+
     axs = np.array(axs).flatten()
-    
+
     for ax in axs:
         ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)        
-        
+        ax.spines["right"].set_visible(False)
+
         ax.set_xlabel(ax.get_xlabel(), fontsize=label_fs)
-        ax.set_ylabel(ax.get_ylabel(), fontsize=label_fs)     
+        ax.set_ylabel(ax.get_ylabel(), fontsize=label_fs)
 
 
 #### CLOUD ###
 
 def get_s3_client(region_name):
+    import boto3
+    from botocore.config import Config
+    from botocore import UNSIGNED
+
     bc = boto3.client('s3', config=Config(signature_version=UNSIGNED), region_name=region_name)
     return bc
 
@@ -245,6 +251,8 @@ def s3_download_public_folder(remote_folder, destination, bucket, region_name, s
             boto_client.download_file(bucket, object, str(local_file_path))
 
 # GCS
+
+
 def gs_download_folder(bucket, remote_folder, destination):
     dst = Path(destination)
     if not dst.is_dir():
