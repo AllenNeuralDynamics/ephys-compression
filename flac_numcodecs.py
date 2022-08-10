@@ -17,10 +17,6 @@ from numcodecs.compat import ndarray_copy
 
 from tempfile import TemporaryDirectory
 
-from utils import get_random_string
-
-# length of random string for tmp files
-RND_LEN = 10
 
 ##### LOW-LEVEL Classes #####
 try:
