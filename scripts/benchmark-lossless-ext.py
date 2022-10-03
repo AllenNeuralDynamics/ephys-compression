@@ -106,9 +106,10 @@ if overwrite:
         benchmark_file.unlink()
 
 for rec_dset, sessions in rec_dsets.items():
+    print(f"\n\n\nBenchmarking dataset: {rec_dset}")
     lsb_correction = lsb_corrections[rec_dset]
     for session in sessions:
-        print(f"\n\n\nBenchmarking {rec_dset}: {session}\n\n\n")
+        print(f"\n\t Session: {session}\n")
         t_start_all = time.perf_counter()
 
         if rec_dset == "aind":
@@ -123,9 +124,10 @@ for rec_dset, sessions in rec_dsets.items():
         fs = None
         gain = None
         dtype = None
+        rec_folder = None
 
         for cname in compressors:
-            print(f"COMPRESSOR: {cname}")
+            print(f"\t\tCOMPRESSOR: {cname}")
             if cname in blosc_compressors:
                 levels_blosc = levels["blosc"]
                 channel_chunk_sizes_blosc = channel_chunk_sizes["blosc"]
@@ -135,7 +137,7 @@ for rec_dset, sessions in rec_dsets.items():
                             job_kwargs["chunk_duration"] = chunk_dur
                             for shuffle_name, shuffle in blosc_shuffles_dict.items():
                                 for lsb in lsb_correction:
-                                    print(f"\ncompressor {cname} - level {level} chunk dur - {chunk_dur} "
+                                    print(f"\n\t\tcompressor {cname} - level {level} chunk dur - {chunk_dur} "
                                           f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}")
                                     entry_data = {"session": session, "dataset": rec_dset,
                                                   "compressor": cname, "compressor_type": "blosc", "level": level,
@@ -147,13 +149,11 @@ for rec_dset, sessions in rec_dsets.items():
                                         if rec is None:
                                             rec_folder = tmp_folder / session
                                             if not rec_folder.is_dir():
-                                                print(f"Downloading {rec_dset}-{session}")
+                                                print(f"\t\tDownloading {rec_dset}-{session}")
                                                 gs_download_folder(compression_bucket,
                                                                    f"{rec_dset}/{session}", rec_folder.parent)
-                                            else:
-                                                print(f"{rec_folder} found locally")
                                             rec = si.load_extractor(rec_folder)
-                                            print(rec)
+                                            print(f"\n\t\t{rec}\n")
 
                                             # rec_info
                                             num_channels = rec.get_num_channels()
@@ -243,12 +243,12 @@ for rec_dset, sessions in rec_dsets.items():
                                                 "dspeed1s_xrt": decompression_1s_rt,
                                                 "channel_chunk_size": channel_chunk_size}
                                         append_to_csv(benchmark_file, data, subset_columns=subset_columns)
-                                        print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
+                                        print(f"\t\tCompression took {compression_elapsed_time}s - CR={cr} - "
                                               f"DC10s={decompression_10s_elapsed_time}s")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
                                     else:
-                                        print(f"Entry for {rec_file.name} with compressor {cname} - level {level} "
+                                        print(f"\t\tEntry for {rec_dset}/{session} with compressor {cname} - level {level} "
                                               f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
                                               f"channel_chunk_size {channel_chunk_size} already present\n")
             elif cname in zarr_compressors:
@@ -260,7 +260,7 @@ for rec_dset, sessions in rec_dsets.items():
                             job_kwargs["chunk_duration"] = chunk_dur
                             for shuffle_name, filters in zarr_shuffles_dict.items():
                                 for lsb in lsb_correction:
-                                    print(f"\ncompressor {cname} - level {level} chunk dur - {chunk_dur} "
+                                    print(f"\n\t\tcompressor {cname} - level {level} chunk dur - {chunk_dur} "
                                           f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}")
                                     entry_data = {"session": session, "dataset": rec_dset,
                                                   "compressor": cname, "compressor_type": "numcodecs", "level": level,
@@ -272,13 +272,11 @@ for rec_dset, sessions in rec_dsets.items():
                                         if rec is None:
                                             rec_folder = tmp_folder / session
                                             if not rec_folder.is_dir():
-                                                print(f"Downloading {rec_dset}-{session}")
+                                                print(f"\t\tDownloading {rec_dset}-{session}")
                                                 gs_download_folder(compression_bucket,
                                                                    f"{rec_dset}/{session}", rec_folder.parent)
-                                            else:
-                                                print(f"{rec_folder} found locally")
                                             rec = si.load_extractor(rec_folder)
-                                            print(rec)
+                                            print(f"\n\t\t{rec}\n")
 
                                             # rec_info
                                             num_channels = rec.get_num_channels()
@@ -369,12 +367,12 @@ for rec_dset, sessions in rec_dsets.items():
                                                 "dspeed1s_xrt": decompression_1s_rt,
                                                 "channel_chunk_size": channel_chunk_size}
                                         append_to_csv(benchmark_file, data, subset_columns=subset_columns)
-                                        print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
+                                        print(f"\t\tCompression took {compression_elapsed_time}s - CR={cr} - "
                                               f"DC10s={decompression_10s_elapsed_time}s")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
                                     else:
-                                        print(f"Entry for {rec_dset}/{session} with compressor {cname} - level {level} "
+                                        print(f"\t\tEntry for {rec_dset}/{session} with compressor {cname} - level {level} "
                                               f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
                                               f"channel_chunk_size {channel_chunk_size} already present\n")
             else:
@@ -391,7 +389,7 @@ for rec_dset, sessions in rec_dsets.items():
                             job_kwargs["chunk_duration"] = chunk_dur
                             for shuffle_name, filters in audio_shuffles_dict.items():
                                 for lsb in lsb_correction:
-                                    print(f"compressor {cname} - level {level} chunk dur - {chunk_dur} "
+                                    print(f"\t\tcompressor {cname} - level {level} chunk dur - {chunk_dur} "
                                           f"shuffle {shuffle_name} - lsb {lsb} - channel_chunk_size {channel_chunk_size}\n")
                                     entry_data = {"session": session, "dataset": rec_dset,
                                                   "compressor": cname, "compressor_type": "audio", "level": level,
@@ -403,13 +401,11 @@ for rec_dset, sessions in rec_dsets.items():
                                         if rec is None:
                                             rec_folder = tmp_folder / session
                                             if not rec_folder.is_dir():
-                                                print(f"Downloading {rec_dset}-{session}")
+                                                print(f"\t\tDownloading {rec_dset}-{session}")
                                                 gs_download_folder(compression_bucket,
                                                                    f"{rec_dset}/{session}", rec_folder.parent)
-                                            else:
-                                                print(f"{rec_folder} found locally")
                                             rec = si.load_extractor(rec_folder)
-                                            print(rec)
+                                            print(f"\n\t\t{rec}\n")
 
                                             # rec_info
                                             num_channels = rec.get_num_channels()
@@ -497,14 +493,15 @@ for rec_dset, sessions in rec_dsets.items():
                                                 "dspeed1s_xrt": decompression_1s_rt,
                                                 "channel_chunk_size": channel_chunk_size}
                                         append_to_csv(benchmark_file, data, subset_columns=subset_columns)
-                                        print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
+                                        print(f"\t\tCompression took {compression_elapsed_time}s - CR={cr} - "
                                               f"DC10s={decompression_10s_elapsed_time}s")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
                                     else:
-                                        print(f"Entry for {rec_dset}/{session} with compressor {cname} - level {level} "
+                                        print(f"\t\tEntry for {rec_dset}/{session} with compressor {cname} - level {level} "
                                               f"chunk duration - {chunk_dur} shuffle {shuffle_name} - lsb {lsb} "
                                               f"channel_chunk_size {channel_chunk_size} already present\n")
 
         # remove tmp path
-        shutil.rmtree(rec_folder)
+        if rec_folder is not None:
+            shutil.rmtree(rec_folder)
