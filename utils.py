@@ -4,11 +4,8 @@ from tqdm import tqdm
 import numpy as np
 import string
 import random
-import numcodecs
 import time
-import neo
 
-import spikeinterface.full as si
 from pathlib import Path
 
 
@@ -95,6 +92,7 @@ def get_median_and_lsb(recording, num_random_chunks=10):
     np.arrahy
         median values for each channel
     """
+    import spikeinterface as si
     # compute lsb and median
     # gather chunks
     chunks = None
@@ -136,6 +134,7 @@ def get_median_and_lsb(recording, num_random_chunks=10):
 
 
 def trunc_filter(bits, recording):
+    import numcodecs
     scale = 1.0 / (2 ** bits)
     dtype = recording.get_dtype()
     if bits == 0:
@@ -146,6 +145,8 @@ def trunc_filter(bits, recording):
 
 def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
                           time_range=[10, 20], channel_chunk_size=-1, **job_kwargs):
+    import spikeinterface.full as si
+
     fs = rec_to_compress.get_sampling_frequency()
     print("compressing")
     t_start = time.perf_counter()
@@ -274,6 +275,7 @@ def gs_upload_folder(bucket, remote_folder, local_folder):
 
 
 def get_oe_stream(oe_folder):
+    import neo
     # we have to first access the different streams (i.e., different probes)
     io = neo.rawio.OpenEphysBinaryRawIO(oe_folder)
     io._parse_header()
