@@ -100,9 +100,10 @@ if __name__ == "__main__":
     else:
         dsets = all_dsets
 
-    ephys_benchmark_folder = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
-    if len(ephys_benchmark_folder) != 1:
+    ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
+    if len(ephys_benchmark_folders) != 1:
         raise Exception("Can't find attached compression benchamrk data bucket")
+    ephys_benchmark_folder = ephys_benchmark_folders[0]
     print(f"Benchmark data folder: {ephys_benchmark_folder}")
 
     print(f"spikeinterface version: {si.__version__}")
