@@ -41,13 +41,6 @@ data_folder = Path("../data")
 results_folder = Path("../results")
 scratch_folder = Path("../scratch")
 
-ephys_benchmark_folder = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
-if len(ephys_benchmark_folder) != 1:
-    raise Exception("Can't find attached compression benchamrk data bucket"))
-print(f"Benchmark data folder: {ephys_benchmark_folder}")
-
-print(f"spikeinterface: {si.__version__}")
-
 job_kwargs = dict(n_jobs=16, chunk_duration="1s", progress_bar=True)
 ks25_sorter_params = job_kwargs
 time_range_rmse = [15, 20]
@@ -106,6 +99,13 @@ if __name__ == "__main__":
             dsets = [sys.argv[1]]
     else:
         dsets = all_dsets
+
+    ephys_benchmark_folder = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
+    if len(ephys_benchmark_folder) != 1:
+        raise Exception("Can't find attached compression benchamrk data bucket")
+    print(f"Benchmark data folder: {ephys_benchmark_folder}")
+
+    print(f"spikeinterface version: {si.__version__}")
 
     tmp_folder = results_folder / "tmp"
     if tmp_folder.is_dir():
