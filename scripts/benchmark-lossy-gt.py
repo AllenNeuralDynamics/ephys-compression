@@ -11,12 +11,12 @@ from tqdm import tqdm
 import sys
 import os
 
-from numcodecs import Blosc, FixedScaleOffset
+from numcodecs import Blosc
+from wavpack_numcodecs import WavPack
 
 sys.path.append("..")
 
-from audio_numcodecs import WavPackCodec
-from utils import append_to_csv, get_median_and_lsb, is_entry, trunc_filter, benchmark_compression
+from utils import append_to_csv, is_entry, trunc_filter, benchmark_compression
 
 
 print(f"spikeinterface: {si.__version__}")
@@ -55,7 +55,7 @@ clevel = 9
 zarr_compressor = Blosc(cname='zstd', clevel=clevel, shuffle=Blosc.BITSHUFFLE)
 
 # define wavpack options
-compression_mode = "h"
+compression_level = 3
 
 factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
            "wavpack": [6, 5, 4, 3.5, 3, 2.5, 2, 0]}
@@ -89,10 +89,8 @@ for rec_file in rec_files:
     
     if "np1" in rec_file.name:
         probe_name = "Neuropixels1.0"
-        lsb_value = 12
     else:
         probe_name = "Neuropixels2.0"
-        lsb_value = 3
 
     gt_dict[probe_name] = {}        
     gt_dict[probe_name]["rec_gt"] = rec
@@ -107,9 +105,7 @@ for rec_file in rec_files:
     
     time_range_rmse = [15, 20]
 
-    # median correction not needed
-    rec_to_compress = si.scale(rec, gain=1. / lsb_value, dtype=dtype)
-    rec_to_compress.set_channel_gains(rec_to_compress.get_channel_gains()*lsb_value)
+    rec_to_compress = si.correct_lsb(rec)
     
     full_size = rec.get_dtype().itemsize * rec.get_num_samples() * rec.get_num_channels()
 
@@ -129,14 +125,11 @@ for rec_file in rec_files:
                     shutil.rmtree(zarr_path)
                 
                 if strategy == "bit_truncation":
-                    filters = trunc_filter(factor, rec)
+                    filters = trunc_filter(factor, rec.get_dtype())
                     compressor = zarr_compressor
                 else:
                     filters = None
-                    if factor != 0:
-                        compressor = WavPackCodec(compression_mode=compression_mode, hybrid_factor=factor)
-                    else:
-                        compressor = WavPackCodec(compression_mode=compression_mode, hybrid_factor=None)
+                    compressor = WavPack(level=compression_level, bps=factor)
 
 
                 cr, xRT, elapsed_time, rmse = benchmark_compression(rec_to_compress, compressor, zarr_path, 
@@ -145,8 +138,7 @@ for rec_file in rec_files:
 
                 new_data = {"probe": probe_name, "rec_gt": str(rec_file.absolute()), "strategy": strategy, 
                             "factor": factor, "CR": cr, "Cspeed": elapsed_time, 
-                            "xRT": xRT, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute()), 
-                            "lsb_value": lsb_value}
+                            "xRT": xRT, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute())}
                 append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
                 print(f"Elapsed time {strategy}-{factor}: {elapsed_time}s - CR: {cr} - rmse: {rmse}")

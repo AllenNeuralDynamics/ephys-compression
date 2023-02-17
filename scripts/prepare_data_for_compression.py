@@ -34,7 +34,7 @@ import sys
 
 sys.path.append("..")
 
-from utils import get_oe_stream, gs_download_folder, gs_upload_folder, \
+from utils import gs_download_folder, gs_upload_folder, \
     s3_download_public_file, s3_download_public_folder
 
 ephys_compression_folder_path = Path(__file__).parent.parent
@@ -112,9 +112,9 @@ for session, session_data in aind_sessions.items():
                         sett.unlink()
 
             # streams
-            streams = get_oe_stream(oe_folder)
-            stream_name = [stream_name for stream_name in streams["name"] if session_data["probe"] in stream_name][0]
-            stream_id = streams["id"][list(streams["name"]).index(stream_name)]
+            stream_names, stream_ids = si.get_neo_stream("openephys", oe_folder)
+            stream_name = [stream_name for stream_name in stream_names if session_data["probe"] in stream_name][0]
+            stream_id = stream_ids[stream_names.index(stream_name)]
 
             # load recording
             recording = si.read_openephys(oe_folder, stream_id=stream_id)
@@ -156,7 +156,8 @@ dataset = "ibl"
 
 ibl_sessions = {"CSHZAD026_2020-09-04_probe00": "CSH_ZAD_026/2020-09-04/001/raw_ephys_data/probe00",
                 "CSHZAD029_2020-09-09_probe00": "CSH_ZAD_029/2020-09-09/001/raw_ephys_data/probe00",
-                "SWC054_2020-10-05_probe01": "SWC_054/2020-10-05/001/raw_ephys_data/probe00"}
+                "SWC054_2020-10-05_probe00": "SWC_054/2020-10-05/001/raw_ephys_data/probe00",
+                "SWC054_2020-10-05_probe01": "SWC_054/2020-10-05/001/raw_ephys_data/probe01"}
 
 for session, session_path in ibl_sessions.items():
     print(session)
