@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
                         rec_compressed, cr, cspeed_xrt, elapsed_time, rmse = \
                             benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, 
-                                                        filters=filters, time_range=time_range_rmse, 
+                                                        filters=filters, time_range_rmse=time_range_rmse,
                                                         **job_kwargs)
                         print(f"Compression {rec_name}: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
 
