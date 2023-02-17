@@ -1,21 +1,37 @@
-# Benchmark compression strategies
-import spikeinterface.full as si
-import probeinterface as pi
+"""
+Benchmark lossy compression strategies on simulated data.
+
+The script expects a CodeOcean file organization
+
+- code
+- data
+- results
+
+The script is run from the "code" folder and expect the "aind-ephys-compression-benchmark-data" bucket to be attached 
+to the data folder.
+
+Different datasets (aind1, aind2, ibl, mindscope) can be run in parallel by passing them as an argument (or using the 
+"App Panel").
+"""
+
+### TODO: Update this and test on CodeOcean ###
 
 import time
-from pathlib import Path
 import shutil
+import sys
+
+from pathlib import Path
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import sys
-import os
+
+import spikeinterface.full as si
 
 from numcodecs import Blosc
 from wavpack_numcodecs import WavPack
 
-sys.path.append("..")
-
+# add utils to path
+this_folder = Path(__file__).parent
+sys.path.append(str(this_folder.parent))
 from utils import append_to_csv, is_entry, trunc_filter, benchmark_lossy_compression
 
 
@@ -132,9 +148,10 @@ for rec_file in rec_files:
                     compressor = WavPack(level=compression_level, bps=factor)
 
 
-                cr, cspeed_xrt, elapsed_time, rmse = benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, 
-                                                                          filters=filters, time_range=time_range_rmse, 
-                                                                          **job_kwargs)
+                cr, cspeed_xrt, elapsed_time, rmse = \
+                    benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, 
+                                                filters=filters, time_range_rmse=time_range_rmse, 
+                                                **job_kwargs)
 
                 new_data = {"probe": probe_name, "rec_gt": str(rec_file.absolute()), "strategy": strategy, 
                             "factor": factor, "CR": cr, "Cspeed": elapsed_time, 

@@ -1,5 +1,5 @@
 """
-Benchmark lossy compression strategies
+Benchmark lossy compression strategies on experimental data.
 
 The script expects a CodeOcean file organization
 

@@ -1,5 +1,17 @@
 """
-...
+Benchmark lossless compression strategies on experimental data.
+
+The script expects a CodeOcean file organization
+
+- code
+- data
+- results
+
+The script is run from the "code" folder and expect the "aind-ephys-compression-benchmark-data" bucket to be attached 
+to the data folder.
+
+Different datasets (aind1, aind2, ibl, mindscope) can be run in parallel by passing them as an argument (or using the 
+"App Panel").
 """
 import spikeinterface as si
 import spikeinterface.preprocessing as spre
@@ -307,7 +319,7 @@ if __name__ == "__main__":
                                                 "dspeed1s_xrt": decompression_1s_rt, "channel_chunk_size": channel_chunk_size}
                                         append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                         print(f"Compression took {compression_elapsed_time}s - CR={cr} - "
-                                            f"DC10s={decompression_10s_elapsed_time}s")
+                                              f"cspeed_xrt={cspeed_xrt} - dspeed10s_xrt={decompression_10s_rt}")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
                                     else:
