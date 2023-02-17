@@ -12,7 +12,7 @@ AIND: 8 NP2 datasets
 To ensure a fair comparison in terms of compression time (not affected by how the data is stored),
 all data are loaded and saved to binary by SI.
 
-The final datasets are uploaded in the "gs://aind-ephys-compression-benchmark-data" bucket.
+The final datasets are uploaded in the "s3://aind-ephys-compression-benchmark-data" bucket (and also on gs://).
 """
 
 from pathlib import Path
@@ -213,11 +213,8 @@ mindscope_sessions = {
     "754312389_756781559": "754312389/756781559/spike_band.dat",
     "766640955_773592324": "766640955/773592324/spike_band.dat",
     "797828357_805579745": "797828357/805579745/spike_band.dat",
-    "829720705_832129157": "829720705/832129157/spike_band.dat",}
-#     "766640955/773592324/spike_band.dat",
-#     "797828357/805579745/spike_band.dat",
-#     "829720705/832129157/spike_band.dat",
-# ]
+    "829720705_832129157": "829720705/832129157/spike_band.dat"
+}
 
 binary_dict = dict(num_chan=384, sampling_frequency=30000, dtype="int16", gain_to_uV=0.195, offset_to_uV=0)
 

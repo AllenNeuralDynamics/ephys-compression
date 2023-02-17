@@ -16,7 +16,7 @@ from wavpack_numcodecs import WavPack
 
 sys.path.append("..")
 
-from utils import append_to_csv, is_entry, trunc_filter, benchmark_compression
+from utils import append_to_csv, is_entry, trunc_filter, benchmark_lossy_compression
 
 
 print(f"spikeinterface: {si.__version__}")
@@ -42,8 +42,8 @@ tmp_folder = data_folder / "tmp_compression" / "lossy" / "gt"
 tmp_folder.mkdir(exist_ok=True, parents=True)
 
 # NP1.0 and NP2.0
-rec_files = ["/home/alessio/Documents/codes/allen/compression/ephys-compression/data/mearec/np1_mearec_dist-corr.h5", 
-             "/home/alessio/Documents/codes/allen/compression/ephys-compression/data/mearec/np2_mearec_dist-corr.h5"]
+rec_files = ["/home/alessio/Documents/codes/allen/compression/ephys-compression/data/mearec/mearec_NP1.h5", 
+             "/home/alessio/Documents/codes/allen/compression/ephys-compression/data/mearec/mearec_NP2.h5"]
 
 n_jobs = 10
 job_kwargs = dict(n_jobs=n_jobs, chunk_duration="1s", progress_bar=True)
@@ -132,13 +132,13 @@ for rec_file in rec_files:
                     compressor = WavPack(level=compression_level, bps=factor)
 
 
-                cr, xRT, elapsed_time, rmse = benchmark_compression(rec_to_compress, compressor, zarr_path, 
-                                                                    filters=filters, time_range=time_range_rmse, 
-                                                                    **job_kwargs)
+                cr, cspeed_xrt, elapsed_time, rmse = benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, 
+                                                                          filters=filters, time_range=time_range_rmse, 
+                                                                          **job_kwargs)
 
                 new_data = {"probe": probe_name, "rec_gt": str(rec_file.absolute()), "strategy": strategy, 
                             "factor": factor, "CR": cr, "Cspeed": elapsed_time, 
-                            "xRT": xRT, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute())}
+                            "cspeed_xrt": cspeed_xrt, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute())}
                 append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
                 print(f"Elapsed time {strategy}-{factor}: {elapsed_time}s - CR: {cr} - rmse: {rmse}")

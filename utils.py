@@ -1,16 +1,13 @@
 import os
+import time
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
-import string
-import random
-import time
 
-from pathlib import Path
-from tqdm import tqdm
 
 import numcodecs
-
-import spikeinterface.full as si
+import spikeinterface.preprocessing as spre
 
 
 def is_notebook() -> bool:
@@ -121,8 +118,8 @@ def trunc_filter(bits, dtype):
 
     Returns
     -------
-    _type_
-        _description_
+    list
+        List of numcodecs filters
     """
     scale = 1.0 / (2 ** bits)
     if bits == 0:
@@ -131,48 +128,58 @@ def trunc_filter(bits, dtype):
         return [numcodecs.FixedScaleOffset(offset=0, scale=scale, dtype=dtype)]
 
 
-def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
-                          time_range=[10, 20], channel_chunk_size=-1, **job_kwargs):
-    """_summary_
+def benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, filters=None,
+                                time_range_rmse=[10, 20], channel_chunk_size=-1, **job_kwargs):
+    """Benchmarks lossy compression for one recording, including:
+
+    - compression ratio (CR)
+    - compression speed
+    - root mean squared error (RMSE)
 
     Parameters
     ----------
-    rec_to_compress : _type_
-        _description_
-    compressor : _type_
-        _description_
-    zarr_path : _type_
-        _description_
-    filters : _type_, optional
-        _description_, by default None
-    time_range : list, optional
-        _description_, by default [10, 20]
+    rec_to_compress : spikeinterface.BaseRecording
+        The recording to compress
+    compressor : numcodecs.Codec
+        The compressor to use
+    zarr_path : str or path
+        The output zarr path
+    filters : list, optional
+        List of numcodecs filters, by default None
+    time_range_rmse : list, optional
+        Time range to compute RMSE, by default [10, 20]
     channel_chunk_size : int, optional
-        _description_, by default -1
+        The chunk size in the channel dimensions, by default -1
 
     Returns
     -------
-    _type_
-        _description_
+    rec_compressed : ZarrRecordingExtractor
+        The compressed recording
+    cr : float
+        The compression ratio
+    cspeed_xrt : float
+        The compression speed in x real-time
+    cspeed : float
+        Compression speed in seconds
+    rmse : float
+        The RMSE value
     """
     fs = rec_to_compress.get_sampling_frequency()
-    print("compressing")
     t_start = time.perf_counter()
-    rec_compressed = rec_to_compress.save(format="zarr", zarr_path=zarr_path, 
+    rec_compressed = rec_to_compress.save(format="zarr", folder=zarr_path,
                                           compressor=compressor, filters=filters, 
                                           channel_chunk_size=channel_chunk_size,
                                           **job_kwargs)
     t_stop = time.perf_counter()
-    elapsed_time = np.round(t_stop - t_start, 2)
+    cspeed = np.round(t_stop - t_start, 2)
     dur = rec_to_compress.get_num_samples() / fs
-    xRT = dur / elapsed_time
+    cspeed_xrt = dur / cspeed
     cr = np.round(rec_compressed.get_annotation("compression_ratio"), 2)
 
     # rmse
-    print("computing rmse")
-    rec_gt_f = si.bandpass_filter(rec_to_compress)
-    rec_compressed_f = si.bandpass_filter(rec_compressed)
-    frames = np.array(time_range) * fs
+    rec_gt_f = spre.bandpass_filter(rec_to_compress)
+    rec_compressed_f = spre.bandpass_filter(rec_compressed)
+    frames = np.array(time_range_rmse) * fs
     frames = frames.astype(int)
     
     traces_gt = rec_gt_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
@@ -180,19 +187,19 @@ def benchmark_compression(rec_to_compress, compressor, zarr_path, filters=None,
 
     rmse = np.round(np.sqrt(((traces_zarr_f.ravel() - traces_gt.ravel()) ** 2).mean()), 3)
 
-    return rec_compressed, cr, xRT, elapsed_time, rmse
+    return rec_compressed, cr, cspeed_xrt, cspeed, rmse
 
 
 ### PLOTTING UTILS ###
 def prettify_axes(axs, label_fs=15):
-    """_summary_
+    """Makes axes prettier by removing top and right spines and fixing label fontsizes.
 
     Parameters
     ----------
-    axs : _type_
-        _description_
+    axs : list
+        List of matplotlib axes
     label_fs : int, optional
-        _description_, by default 15
+        Label font size, by default 15
     """
     if not isinstance(axs, (list, np.ndarray)):
         axs = [axs]
@@ -209,6 +216,18 @@ def prettify_axes(axs, label_fs=15):
 
 #### CLOUD UTILS ###
 def get_s3_client(region_name):
+    """Set up s3 public client
+
+    Parameters
+    ----------
+    region_name : str
+        The region name
+
+    Returns
+    -------
+    boto3.client
+        The boto3 Client
+    """
     import boto3
     from botocore.config import Config
     from botocore import UNSIGNED
@@ -217,12 +236,18 @@ def get_s3_client(region_name):
 
 
 def s3_download_public_file(object, destination, bucket, region_name):
-    """
-    downloads file from public bucket
-    :param object: relative path of file" 'atlas/dorsal_cortex_50.nrrd'
-    :param destination: full file path on local machine '/usr/ibl/dorsal_cortex_50.nrrd'
-    :param bucket: if not specified, 'ibl-brain-wide-map-public'
-    :return:
+    """Downloads a file from a S3 public bucket.
+
+    Parameters
+    ----------
+    object : str
+        The object to download
+    destination : str
+        The destination path
+    bucket : str
+        The public bucket name
+    region_name : str
+        The region of the public bucket
     """
     destination = Path(destination)
     boto_client = get_s3_client(region_name)
@@ -233,13 +258,24 @@ def s3_download_public_file(object, destination, bucket, region_name):
 
 def s3_download_public_folder(remote_folder, destination, bucket, region_name, skip_patterns=None,
                               overwrite=False, verbose=True):
-    """
-    downloads a public folder content to a local folder
-    :param prefix: relative path within the bucket, for example: 'spikesorting/benchmark'
-    :param destination: local folder path
-    :param bucket: if not specified, 'ibl-brain-wide-map-public'
-    :param boto_client: if not specified, will instantiate one in anonymous mode
-    :return:
+    """Downloads a folder from a S3 public bucket.
+
+    Parameters
+    ----------
+    remote_folder : str
+        The remote folder in the bucket
+    destination : str
+        The local destination folder
+    bucket : str
+        The public bucket name
+    region_name : str
+        The region of the public bucket
+    skip_patterns : list, optional
+        List of string patterns to skip, by default None
+    overwrite : bool, optional
+        If True, it overwrites to local destination, by default False
+    verbose : bool, optional
+        If True output is verbose, by default True
     """
     boto_client = get_s3_client(region_name)
     response = boto_client.list_objects_v2(Prefix=remote_folder, Bucket=bucket)
@@ -269,6 +305,18 @@ def s3_download_public_folder(remote_folder, destination, bucket, region_name, s
 
 
 def gs_download_folder(bucket, remote_folder, destination):
+    """Downloads a folder from a GCS bucket using gsutil.
+    It assumes credentials are correctly set to access the bucket.
+
+    Parameters
+    ----------
+    bucket : str
+        The bucket name
+    remote_folder : str
+        The remote folder in the bucket
+    destination : str
+        The local destination folder
+    """
     dst = Path(destination)
     if not dst.is_dir():
         dst.mkdir()
@@ -281,6 +329,18 @@ def gs_download_folder(bucket, remote_folder, destination):
 
 
 def gs_upload_folder(bucket, remote_folder, local_folder):
+    """Uploads a folder to a GCS bucket using gsutil.
+    It assumes credentials are correctly set to access the bucket.
+
+    Parameters
+    ----------
+    bucket : str
+        The bucket name
+    remote_folder : str
+        The remote folder in the bucket
+    local_folder : str
+        The local folder to upload
+    """
     if not bucket.endswith("/"):
         bucket += "/"
     dst = f"{bucket}{remote_folder}"
@@ -290,19 +350,19 @@ def gs_upload_folder(bucket, remote_folder, local_folder):
 
 ### STATS UTILS ###
 def cohen_d(x, y):
-    """_summary_
+    """Computes the Cohen's d coefficient between samples x and y
 
     Parameters
     ----------
-    x : _type_
-        _description_
-    y : _type_
-        _description_
+    x : np.array
+        Sample x
+    y : np.array
+        Sample y
 
     Returns
     -------
-    _type_
-        _description_
+    float
+        the Cohen's d coefficient
     """
     nx = len(x)
     ny = len(y)
@@ -310,38 +370,48 @@ def cohen_d(x, y):
     return (np.mean(x) - np.mean(y)) / np.sqrt(((nx-1)*np.std(x, ddof=1) ** 2 + (ny-1)*np.std(y, ddof=1) ** 2) / dof)
 
 
-def stat_test(df, param, metrics, sig=0.01, verbose=False):
-    """_summary_
+def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
+    """Performs statistical tests and posthoc analysis.
+
+    If the distributions are normal with equal variance, it performs the ANOVA test and
+    posthoc T-tests (parametric).
+    Otherwise, the non-parametric Kruskal-Wallis and posthoc Conover's tests are used.
 
     Parameters
     ----------
-    df : _type_
-        _description_
-    param : _type_
-        _description_
-    metrics : _type_
-        _description_
+    df : pandas.DataFrame
+        The input dataframe
+    column_group_by : str
+        The categorical column used for grouping
+    test_columns : list
+        The columns containing real values to test for differences.
     sig : float, optional
-        _description_, by default 0.01
+        Significance level, by default 0.01
     verbose : bool, optional
-        _description_, by default False
+        If True output is verbose, by default False
 
     Returns
     -------
-    _type_
-        _description_
+    dict
+        The results dictionary containing, for each metric:
+
+        - "pvalue" :  the p-value for the multiple-sample test
+        - "posthoc" : DataFrame with posthoc p-values
+        - "cohens": DataFrame with Cohen's d coefficients for significant posthoc results
+        - "parametric": True if parametric, False if non-parametric
     """
     from scipy.stats import kruskal, f_oneway, shapiro, levene
     import scikit_posthocs as sp
-    df_gb = df.groupby(param)
+
+    df_gb = df.groupby(column_group_by)
     results = {}
     parametric = False
-    for metric in metrics:
+    for metric in test_columns:
         if verbose:
             print(f"\nTesting metric {metric}\n")
         results[metric] = {}
         samples = ()
-        for val in np.unique(df[param]):
+        for val in np.unique(df[column_group_by]):
             df_val = df_gb.get_group(val)
             samples += (df_val[metric].values,)
         # shapiro test for normality
@@ -368,16 +438,17 @@ def stat_test(df, param, metrics, sig=0.01, verbose=False):
         _, pval = pop_test(*samples)
         if pval < sig:
             # compute posthoc and cohen's d
-            posthoc = ph_test(df, val_col=metric, group_col=param, p_adjust='holm')
-            if verbose:
+            posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust='holm')
+            if verbose and is_notebook():
                 print("Post-hoc")
-                if is_notebook():
-                    display(posthoc)
-            
+                display(posthoc)
+
+            # here we just consider the bottom triangular matrix and just keep significant values
             pvals = np.tril(posthoc.to_numpy(), -1)
             pvals[pvals == 0] = np.nan
             pvals[pvals >= sig] = np.nan
-            ph_c = pd.DataFrame(pvals, columns=ph.columns, index=ph.index)
+            # cohen's d are computed only on significantly different distributions
+            ph_c = pd.DataFrame(pvals, columns=posthoc.columns, index=posthoc.index)
             cols = ph_c.columns.values
             cohens = ph_c.copy()
             for index, row in ph_c.iterrows():
@@ -388,9 +459,9 @@ def stat_test(df, param, metrics, sig=0.01, verbose=False):
                     y = df_gb.get_group(cols[col_ind])[metric].values
                     cohen = cohen_d(x, y)
                     cohens.loc[index, cols[col_ind]] = cohen
-            if verbose:
-                if is_notebook():
-                    display(cohens)
+            if verbose and is_notebook():
+                print("Cohen's d")
+                display(cohens)
         else:
             posthoc = None
             cohens = None 
@@ -398,6 +469,5 @@ def stat_test(df, param, metrics, sig=0.01, verbose=False):
         results[metric]["posthoc"] = posthoc
         results[metric]["cohens"] = cohens
         results[metric]["parametric"] = parametric
-        results[metric]["samples"] = samples
         
     return results
