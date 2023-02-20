@@ -319,7 +319,7 @@ def s3_download_folder(bucket, remote_folder, destination):
     """
     dst = Path(destination)
     if not dst.is_dir():
-        dst.mkdir()
+        dst.mkdir(parents=True)
 
     if not bucket.endswith("/"):
         bucket += "/"
@@ -363,7 +363,7 @@ def gs_download_folder(bucket, remote_folder, destination):
     """
     dst = Path(destination)
     if not dst.is_dir():
-        dst.mkdir()
+        dst.mkdir(parents=True)
 
     if not bucket.endswith("/"):
         bucket += "/"

@@ -225,7 +225,8 @@ if __name__ == "__main__":
             rec_name = f"{strategy}_{factor}"
             rec_zarr = si.read_zarr(zarr_path)
             rec_zarr_f = spre.bandpass_filter(rec_zarr)
-            
+
+            print(f"Lossy waveforms for {strategy}-{factor}")
             we_lossy_path = waveforms_folder / f"wf_lossy_{strategy}_{factor}"
             # compute waveforms
             we_lossy = si.extract_waveforms(rec_zarr_f, sort_gt, folder=we_lossy_path,
@@ -233,7 +234,7 @@ if __name__ == "__main__":
                                             seed=seed, **job_kwargs)
             # compute features
             print(f"Calculating template metrics for {strategy}-{factor}")
-            df_tm_lossy = spost.compute_template_metrics(we_lossy, upsample=10,
+            df_tm_lossy = spost.compute_template_metrics(we_lossy, upsampling_factor=10,
                                                          sparsity=sparsity)
             df_tm_lossy["probe"] = [probe_name] * len(df_tm_lossy)
             df_tm_lossy["unit_id"] = df_tm_lossy.index.to_frame()["unit_id"].values

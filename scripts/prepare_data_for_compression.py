@@ -44,8 +44,9 @@ ephys_compression_folder_path = Path(__file__).parent.parent
 SET YOUR LOCAL CACHE DIRECTORY HERE
 """
 ROOT_PATH = Path("/home/alessio/Documents/data/compression")
+N_JOBS = 20
 
-job_kwargs = dict(n_jobs=20, chunk_duration="1s", progress_bar=True)
+job_kwargs = dict(n_jobs=N_JOBS, chunk_duration="1s", progress_bar=True)
 
 compression_bucket_path = "aind-ephys-compression-benchmark-data"
 compression_bucket = f"s3://{compression_bucket_path}"

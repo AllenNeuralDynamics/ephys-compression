@@ -13,8 +13,7 @@ to the data folder.
 Different datasets (aind1, aind2, ibl, mindscope) can be run in parallel by passing them as an argument (or using the 
 "App Panel").
 """
-from pprint import pprint
-
+import os
 import time
 from pathlib import Path
 import shutil
@@ -109,8 +108,8 @@ chunk_durations = ["0.1s", "1s", "10s"]
 skip_durations = []
 
 # define job kwargs
-n_jobs = 12
-job_kwargs = {'n_jobs': n_jobs, "verbose": False, "progress_bar": True}
+n_jobs = None
+job_kwargs = {'n_jobs': n_jobs if n_jobs is not None else os.cpu_count(), "verbose": False, "progress_bar": True}
 
 # define LSB correction options
 lsb_corrections = {"ibl-np1": {'none': False},  # spikeGLX is already "LSB-corrected"
