@@ -151,7 +151,7 @@ if __name__ == "__main__":
         df = pd.read_csv(benchmark_file, index_col=False)
         print(f"Entries in results: {len(df)}")
 
-        print("\n\TEMPLATE METRICS\n\n")
+        print("\nTEMPLATE METRICS\n\n")
         template_metrics = si.get_template_metric_names()
         benchmark_wfs_file = results_folder / f"benchmark-lossy-gt-wfs-{dset}.csv"
         waveforms_folder = results_folder / f"waveforms-{dset}"
@@ -183,6 +183,7 @@ if __name__ == "__main__":
             selected_channel_idxs = distances_sort_idxs[dist_idxs]
             unit_id_to_channel_ids[unit] = rec_gt.channel_ids[selected_channel_idxs]
         sparsity = si.ChannelSparsity.from_dict(dict(unit_ids=we_gt.unit_ids,
+                                                     channel_ids=we_gt.channel_ids,
                                                      unit_id_to_channel_ids=unit_id_to_channel_ids))
 
         print(f"Calculating GT template metrics")

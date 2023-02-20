@@ -245,8 +245,7 @@ if __name__ == "__main__":
                         sorting_curated_path = sorting_outputs_folder / dset_name / f"sorting_{rec_name}_curated"
                     
                         wf_path = tmp_folder / f"waveforms_raw_{dset_name}_{session}"
-                        we = si.extract_waveforms(rec_zarr_cmr, sorting, folder=wf_path,
-                                                  load_if_exists=True, **job_kwargs)
+                        we = si.extract_waveforms(rec_zarr_cmr, sorting, folder=wf_path, **job_kwargs)
                         _ = spost.compute_spike_amplitudes(we, **job_kwargs)
                         qm = sqm.compute_quality_metrics(we, metric_names=metric_names)
                         units_to_keeps = qm.query(auto_curation_query).index.values
