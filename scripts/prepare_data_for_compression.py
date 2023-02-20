@@ -23,6 +23,8 @@ The final datasets are uploaded in the "s3://aind-ephys-compression-benchmark-da
 ** mindscope data is preprocessed, so it will not be used for benchmarking
 """
 
+from utils import get_oe_stream, gs_download_folder, gs_upload_folder, \
+    s3_download_public_file, s3_download_public_folder
 from pathlib import Path
 import shutil
 import numpy as np
@@ -51,6 +53,8 @@ job_kwargs = dict(n_jobs=N_JOBS, chunk_duration="1s", progress_bar=True)
 compression_bucket_path = "aind-ephys-compression-benchmark-data"
 compression_bucket = f"s3://{compression_bucket_path}"
 delete_tmp_files_as_created = True
+
+print(job_kwargs)
 
 
 fs = s3fs.S3FileSystem()
@@ -249,7 +253,7 @@ ibl_sessions = {
 
 for session, session_path in ibl_sessions.items():
     print(session)
-    
+
     session_folder = output_folder / dataset / session
     remote_location = f"{compression_bucket_path}/{dataset}/{session}"
 
@@ -265,7 +269,7 @@ for session, session_path in ibl_sessions.items():
             dest = tmp_folder / dataset
 
             s3_download_public_folder(f"{prefix}/{session_path}", dest / session, s3_bucket_ibl, region_name_ibl,
-                                    skip_patterns=skip_patterns)
+                                      skip_patterns=skip_patterns)
 
             cbin_folder = dest / session
 

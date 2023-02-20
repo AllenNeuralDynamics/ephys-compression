@@ -55,7 +55,7 @@ def is_entry(csv_file, entry, subset_columns=None):
             
         if np.any([k not in df.columns for k in list(entry.keys())]):
             return False
-        
+
         query = ""
         data_keys = list(entry.keys())
         query_idx = 0
@@ -69,7 +69,7 @@ def is_entry(csv_file, entry, subset_columns=None):
                 if query_idx < len(subset_columns) - 1:
                     query += " and "
                 query_idx += 1
-                
+
         if len(df.query(query)) == 0:
             return False
         else:
@@ -181,7 +181,7 @@ def benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, filters=
     rec_compressed_f = spre.bandpass_filter(rec_compressed)
     frames = np.array(time_range_rmse) * fs
     frames = frames.astype(int)
-    
+
     traces_gt = rec_gt_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
     traces_zarr_f = rec_compressed_f.get_traces(start_frame=frames[0], end_frame=frames[1], return_scaled=True)
 
@@ -203,15 +203,15 @@ def prettify_axes(axs, label_fs=15):
     """
     if not isinstance(axs, (list, np.ndarray)):
         axs = [axs]
-    
+
     axs = np.array(axs).flatten()
-    
+
     for ax in axs:
         ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)        
-        
+        ax.spines["right"].set_visible(False)
+
         ax.set_xlabel(ax.get_xlabel(), fontsize=label_fs)
-        ax.set_ylabel(ax.get_ylabel(), fontsize=label_fs)     
+        ax.set_ylabel(ax.get_ylabel(), fontsize=label_fs)
 
 
 #### CLOUD UTILS ###
