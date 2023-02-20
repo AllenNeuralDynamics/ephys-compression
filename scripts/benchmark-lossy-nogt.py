@@ -90,6 +90,19 @@ auto_curation_query = (f"isi_violations_ratio < {isi_viol_threshold} and "
 sorting_outputs_folder = results_folder / "sortings"
 sorting_outputs_folder.mkdir()
 
+strategies = ["bit_truncation", "wavpack"]
+
+# define options for bit truncation
+zarr_clevel = 9
+zarr_compressor = Blosc(cname='zstd', clevel=zarr_clevel, shuffle=Blosc.BITSHUFFLE)
+
+# define wavpack options
+level = 3
+factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
+           "wavpack": [0, 6, 5, 4, 3.5, 3, 2.25]}
+
+subset_columns = ["dset", "session", "strategy", "factor", "probe"]
+
 if __name__ == "__main__":
 
     if len(sys.argv) == 2:
@@ -108,23 +121,10 @@ if __name__ == "__main__":
 
     print(f"spikeinterface version: {si.__version__}")
 
-    tmp_folder = results_folder / "tmp"
+    tmp_folder = scratch_folder / "tmp"
     if tmp_folder.is_dir():
         shutil.rmtree(tmp_folder)
     tmp_folder.mkdir(exist_ok=True, parents=True)
-
-    strategies = ["bit_truncation", "wavpack"]
-
-    # define options for bit truncation
-    zarr_clevel = 9
-    zarr_compressor = Blosc(cname='zstd', clevel=zarr_clevel, shuffle=Blosc.BITSHUFFLE)
-
-    # define wavpack options
-    level = 3
-    factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
-               "wavpack": [0, 6, 5, 4, 3.5, 3, 2.25]}
-
-    subset_columns = ["dset", "session", "strategy", "factor", "probe"]
 
     for dset in dsets:
         print(f"\n\nProcessing dataset {dset}\n\n") 
@@ -229,12 +229,14 @@ if __name__ == "__main__":
                         sorting_saved = sorting.save(folder=sorting_path)
                         # cleanup
                         shutil.rmtree(raw_sorting_output_folder)
+                        sorting = sorting_saved
                         
                         new_data["sorting_path"] = str(sorting_path.absolute())
                         new_data["n_raw_units"] = len(sorting_saved.unit_ids)
                         new_data["n_ks_good_units"] = len(sorting_good.unit_ids)
 
-                        print(f"Spike sorting {rec_name}: num units - {len(sorting.unit_ids)} num KS good units - {len(sorting_good.unit_ids)}\n")
+                        print(f"Spike sorting {rec_name}: num units - {len(sorting.unit_ids)} num KS good units "
+                              f"- {len(sorting_good.unit_ids)}\n")
 
                     
                         # run auto-curation
@@ -256,13 +258,15 @@ if __name__ == "__main__":
                         new_data["n_curated_good_units"] = len(sorting_curated.unit_ids)
                         new_data["n_curated_bad_units"] = len(sorting.unit_ids) - len(sorting_curated.unit_ids)
 
-                        print(f"Curation {rec_name}: num units - {len(sorting.unit_ids)} num auto-curated units {len(sorting_curated.unit_ids)}\n")
+                        print(f"Curation {rec_name}: num units - {len(sorting.unit_ids)} num auto-curated units "
+                              f"{len(sorting_curated.unit_ids)}\n")
 
                         append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
                         print(f"\nSummary {rec_name}:\n")
                         print(f"Compression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
-                        print(f"Spike sorting: num units - {len(sorting.unit_ids)} num KS good units - {len(sorting_good.unit_ids)}\n")
+                        print(f"Spike sorting: num units - {len(sorting.unit_ids)} num KS good units - "
+                              f"{len(sorting_good.unit_ids)}\n")
                         print(f"Curation: num auto-curated units {len(sorting_curated.unit_ids)}\n")
                         # clean up
                         shutil.rmtree(zarr_path)
