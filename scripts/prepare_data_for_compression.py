@@ -96,7 +96,7 @@ for session, session_data in aind_np2_sessions.items():
             oe_folder = dest / session
             if not oe_folder.is_dir():
                 print(f"Downloading {session}")
-                s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", dest)
+                s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
 
             # clean (keep experiment1 only)
             record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][0]
@@ -114,12 +114,12 @@ for session, session_data in aind_np2_sessions.items():
                         sett.unlink()
 
             # streams
-            stream_names, stream_ids = si.get_neo_stream("openephys", oe_folder)
+            stream_names, stream_ids = se.get_neo_streams("openephys", oe_folder)
             stream_name = [stream_name for stream_name in stream_names if session_data["probe"] in stream_name][0]
             stream_id = stream_ids[stream_names.index(stream_name)]
 
             # load recording
-            recording = si.read_openephys(oe_folder, stream_id=stream_id)
+            recording = se.read_openephys(oe_folder, stream_id=stream_id)
 
             # find longest segment
             if recording.get_num_segments() > 1:
@@ -179,7 +179,7 @@ for session, session_data in aind_np1_sessions.items():
             oe_folder = dest / session
             if not oe_folder.is_dir():
                 print(f"Downloading {session}")
-                s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", dest)
+                s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
 
             # clean (keep experiment1 only)
             record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][0]
@@ -197,12 +197,12 @@ for session, session_data in aind_np1_sessions.items():
                         sett.unlink()
 
             # streams
-            stream_names, stream_ids = si.get_neo_stream("openephys", oe_folder)
+            stream_names, stream_ids = se.get_neo_streams("openephys", oe_folder)
             stream_name = [stream_name for stream_name in stream_names if session_data["probe"] in stream_name][0]
             stream_id = stream_ids[stream_names.index(stream_name)]
 
             # load recording
-            recording = si.read_openephys(oe_folder, stream_id=stream_id)
+            recording = se.read_openephys(oe_folder, stream_id=stream_id)
 
             # find longest segment
             if recording.get_num_segments() > 1:
@@ -268,7 +268,7 @@ for session, session_path in ibl_sessions.items():
 
             cbin_folder = dest / session
 
-            recording = si.read_cbin_ibl(cbin_folder)
+            recording = se.read_cbin_ibl(cbin_folder)
             print(recording)
 
             # save output to binary
