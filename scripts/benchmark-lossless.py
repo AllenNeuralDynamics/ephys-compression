@@ -13,9 +13,6 @@ to the data folder.
 Different datasets (aind1, aind2, ibl, mindscope) can be run in parallel by passing them as an argument (or using the 
 "App Panel").
 """
-import spikeinterface as si
-import spikeinterface.preprocessing as spre
-
 from pprint import pprint
 
 import time
@@ -24,9 +21,13 @@ import shutil
 import numpy as np
 import pandas as pd
 import sys
+import json
 
 from numcodecs import Blosc, Shuffle
 import numcodecs
+
+import spikeinterface as si
+import spikeinterface.preprocessing as spre
 
 # add utils to path
 this_folder = Path(__file__).parent
@@ -115,6 +116,8 @@ subset_columns = ["session", "dataset", "compressor", "compressor_type", "chunk_
                   "level", "shuffle", "lsb", "probe", "channel_chunk_size"]
 
 if __name__ == "__main__":
+    # check if json files in data
+    json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
 
     if len(sys.argv) == 3:
         if sys.argv[1] == "all":
@@ -125,6 +128,11 @@ if __name__ == "__main__":
             comp_types = all_compressor_types
         else:
             comp_types = [sys.argv[2]]
+    elif len(json_files) == 1:
+        config_file = json_files[0]
+        config = json.load(open(config_file, 'r'))
+        dsets = [config["dset"]]
+        comp_types = [config["comp_type"]]
     else:
         dsets = all_dsets
         comp_types = all_compressor_types

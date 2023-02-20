@@ -134,17 +134,17 @@ if __name__ == "__main__":
                         filters = None
                         compressor = WavPack(level=wv_level, bps=factor)
 
-                    cr, cspeed_xrt, elapsed_time, rmse = \
+                    rec_compressed, cr, cspeed_xrt, cspeed, rmse = \
                         benchmark_lossy_compression(rec_to_compress, compressor, zarr_path,
                                                     filters=filters, time_range_rmse=time_range_rmse,
                                                     **job_kwargs)
 
                     new_data = {"probe": probe_name, "rec_gt": str(rec_file.absolute()), "strategy": strategy,
-                                "factor": factor, "CR": cr, "Cspeed": elapsed_time,
+                                "factor": factor, "CR": cr, "Cspeed": cspeed,
                                 "cspeed_xrt": cspeed_xrt, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute())}
                     append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
-                    print(f"Elapsed time {strategy}-{factor}: {elapsed_time}s - CR: {cr} - rmse: {rmse}")
+                    print(f"Elapsed time {strategy}-{factor}: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}")
                 else:
                     print(f"{strategy} factor {factor} already computed")
 
