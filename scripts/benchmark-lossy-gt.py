@@ -87,7 +87,7 @@ if __name__ == "__main__":
     for dset in all_dsets:
         benchmark_file = results_folder / f"benchmark-lossy-gt-{dset}.csv"
 
-        rec_file = [p for p in (ephys_benchmark_folder / "mearec").iterdir() if p.suffix == ".h5" and dset in p.name]
+        rec_file = [p for p in (ephys_benchmark_folder / "mearec").iterdir() if p.suffix == ".h5" and dset in p.name][0]
 
         print(f"\n\n\nBenchmarking {rec_file.name}\n\n\n")
         t_start_all = time.perf_counter()
