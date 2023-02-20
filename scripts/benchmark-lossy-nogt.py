@@ -49,20 +49,22 @@ time_range_rmse = [15, 20]
 sorter = "kilosort2_5"
 sorter_params = ks25_sorter_params
 
-all_dsets = ["aind1", "aind2", "ibl", "mindscope"]
-
 # we split AIND datasets in two sessions to parallelize computations
 sessions = {
-    "aind1": ["595262_2022-02-21_15-18-07_ProbeA",
-              "602454_2022-03-22_16-30-03_ProbeB"],
-    "aind2": ["612962_2022-04-13_19-18-04_ProbeB",
-              "618384_2022-04-14_15-11-00_ProbeB"],
-    "ibl": ["CSHZAD026_2020-09-04_probe00",
-            "SWC054_2020-10-05_probe00"],
-    "mindscope": ["754312389_probe756781559",
-                  "829720705_probe832129157"]
+    "aind-np2-1": ["595262_2022-02-21_15-18-07_ProbeA",
+                   "602454_2022-03-22_16-30-03_ProbeB"],
+    "aind-np2-2": ["612962_2022-04-13_19-18-04_ProbeB",
+                   "618384_2022-04-14_15-11-00_ProbeB"],
+    "aind-np1": ['613482_2022-06-16_17-49-19_ProbeA',
+                 '625749_2022-08-03_15-15-63_ProbeA'],
+    "ibl-np1": ["CSHZAD026_2020-09-04_probe00",
+                "SWC054_2020-10-05_probe00"],
+    # "mindscope-np1": ["754312389_probe756781559",
+    #                   "829720705_probe832129157"]
 
 }
+all_dsets = ["aind-np2-1", "aind-np2-2", "ibl-np1", "aind-np1"] #"mindscope-np1"]
+
 
 # auto curation
 isi_viol_threshold = 0.5
@@ -144,9 +146,12 @@ if __name__ == "__main__":
 
             t_start_session = time.perf_counter()
             
-            if "aind" in dset:
+            if "aind-np2" in dset:
                 probe_name = "Neuropixels2.0"
-                dset_name = "aind"
+                dset_name = "aind-np2"
+            elif "aind-np1" in dset:
+                probe_name = "Neuropixels2.0"
+                dset_name = "aind-np1"
             else:
                 probe_name = "Neuropixels1.0"
                 dset_name = dset

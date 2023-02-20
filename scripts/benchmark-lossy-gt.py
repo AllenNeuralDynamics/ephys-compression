@@ -19,7 +19,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import spikeinterface.full as si
+import spikeinterface as si
+import spikeinterface.extractors as se
+import spikeinterface.preprocessing as spre
+import spikeinterface.postprocessing as spost
+import spikeinterface.comparison as sc
+
+
 
 from numcodecs import Blosc
 from wavpack_numcodecs import WavPack
@@ -92,7 +98,7 @@ if __name__ == "__main__":
         print(f"\n\n\nBenchmarking {rec_file.name}\n\n\n")
         t_start_all = time.perf_counter()
 
-        rec, sort_gt= si.read_mearec(rec_file)
+        rec, sort_gt= se.read_mearec(rec_file)
         print(rec)
         
         if dset == "NP1":
@@ -110,7 +116,7 @@ if __name__ == "__main__":
         gain = rec.get_channel_gains()[0]
         num_channels = rec.get_num_channels()
 
-        rec_to_compress = si.correct_lsb(rec)
+        rec_to_compress = spre.correct_lsb(rec, verbose=True)
         zarr_root = f"{rec_file.stem}"
 
         print("\n\nCOMPRESSION\n\n")
@@ -152,7 +158,7 @@ if __name__ == "__main__":
         print(f"Entries in results: {len(df)}")
 
         print("\nTEMPLATE METRICS\n\n")
-        template_metrics = si.get_template_metric_names()
+        template_metrics = spost.get_template_metric_names()
         benchmark_wfs_file = results_folder / f"benchmark-lossy-gt-wfs-{dset}.csv"
         waveforms_folder = results_folder / f"waveforms-{dset}"
         waveforms_folder.mkdir(exist_ok=True, parents=True)
@@ -160,7 +166,7 @@ if __name__ == "__main__":
         print(f"GT waveforms for {dset}")
         rec_gt = gt_dict[dset]["rec_gt"]
         sort_gt = gt_dict[dset]["sort_gt"]
-        rec_gt_f = si.bandpass_filter(rec_gt)
+        rec_gt_f = spre.bandpass_filter(rec_gt)
         
         we_gt_path = waveforms_folder / f"wf_gt"
         we_gt = si.extract_waveforms(rec_gt_f, sort_gt, folder=we_gt_path, 
@@ -187,8 +193,8 @@ if __name__ == "__main__":
                                                      unit_id_to_channel_ids=unit_id_to_channel_ids))
 
         print(f"Calculating GT template metrics")
-        df_tm = si.compute_template_metrics(we_gt, upsample=10,
-                                            sparsity=sparsity)
+        df_tm = spost.compute_template_metrics(we_gt, upsampling_factor=10,
+                                               sparsity=sparsity)
         df_tm["probe"] = [probe_name] * len(df_tm)
         df_tm["unit_id"] = df_tm.index.to_frame()["unit_id"].values
         df_tm["channel_id"] = df_tm.index.to_frame()["channel_id"].values
@@ -218,7 +224,7 @@ if __name__ == "__main__":
             zarr_path = row["rec_zarr_path"]
             rec_name = f"{strategy}_{factor}"
             rec_zarr = si.read_zarr(zarr_path)
-            rec_zarr_f = si.bandpass_filter(rec_zarr)
+            rec_zarr_f = spre.bandpass_filter(rec_zarr)
             
             we_lossy_path = waveforms_folder / f"wf_lossy_{strategy}_{factor}"
             # compute waveforms
@@ -227,8 +233,8 @@ if __name__ == "__main__":
                                             seed=seed, **job_kwargs)
             # compute features
             print(f"Calculating template metrics for {strategy}-{factor}")
-            df_tm_lossy = si.compute_template_metrics(we_lossy, upsample=10,
-                                                      sparsity=sparsity)
+            df_tm_lossy = spost.compute_template_metrics(we_lossy, upsample=10,
+                                                         sparsity=sparsity)
             df_tm_lossy["probe"] = [probe_name] * len(df_tm_lossy)
             df_tm_lossy["unit_id"] = df_tm_lossy.index.to_frame()["unit_id"].values
             df_tm_lossy["channel_id"] = df_tm_lossy.index.to_frame()["channel_id"].values
@@ -269,11 +275,11 @@ if __name__ == "__main__":
             factor = row["factor"]
             zarr_path = row["rec_zarr_path"]
             rec_zarr = si.read_zarr(zarr_path)
-            rec_zarr_f = si.bandpass_filter(rec_zarr)
+            rec_zarr_f = spre.bandpass_filter(rec_zarr)
             gt_study_dict[f"{strategy}_{factor}"] = (rec_zarr_f, sort_gt)
 
         print(f"GT study recordings: {list(gt_study_dict.keys())}")
-        study = si.GroundTruthStudy.create(study_folder, gt_study_dict, **job_kwargs)
+        study = sc.GroundTruthStudy.create(study_folder, gt_study_dict, **job_kwargs)
 
         sorter_list = ["kilosort2_5"]
         sorter_params = dict(kilosort_2_5=ks25_sorter_params)

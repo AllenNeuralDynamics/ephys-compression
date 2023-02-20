@@ -304,6 +304,50 @@ def s3_download_public_folder(remote_folder, destination, bucket, region_name, s
             boto_client.download_file(bucket, object, str(local_file_path))
 
 
+def s3_download_folder(bucket, remote_folder, destination):
+    """Downloads a folder from an S3 bucket using aws s3 CLI.
+    It assumes credentials are correctly set to access the bucket.
+
+    Parameters
+    ----------
+    bucket : str
+        The bucket name
+    remote_folder : str
+        The remote folder in the bucket
+    destination : str
+        The local destination folder
+    """
+    dst = Path(destination)
+    if not dst.is_dir():
+        dst.mkdir()
+
+    if not bucket.endswith("/"):
+        bucket += "/"
+    src = f"{bucket}{remote_folder}"
+
+    os.system(f"aws s3 cp {src} {dst} --recursive")
+
+
+def s3_upload_folder(bucket, remote_folder, local_folder):
+    """Uploads a folder to a s3 bucket using aws s3 CLI.
+    It assumes credentials are correctly set to access the bucket.
+
+    Parameters
+    ----------
+    bucket : str
+        The bucket name
+    remote_folder : str
+        The remote folder in the bucket
+    local_folder : str
+        The local folder to upload
+    """
+    if not bucket.endswith("/"):
+        bucket += "/"
+    dst = f"{bucket}{remote_folder}"
+
+    os.system(f"aws s3 sync {local_folder} {dst}")
+
+
 def gs_download_folder(bucket, remote_folder, destination):
     """Downloads a folder from a GCS bucket using gsutil.
     It assumes credentials are correctly set to access the bucket.

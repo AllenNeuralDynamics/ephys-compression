@@ -51,25 +51,29 @@ tmp_folder.mkdir(exist_ok=True, parents=True)
 
 # gather data
 sessions = {
-    "aind1": ['595262_2022-02-21_15-18-07_ProbeA',
-              '602454_2022-03-22_16-30-03_ProbeB',
-              '612962_2022-04-13_19-18-04_ProbeB',
-              '612962_2022-04-14_17-17-10_ProbeC',],
-    "aind2": ['618197_2022-06-21_14-08-06_ProbeC',
-              '618318_2022-04-13_14-59-07_ProbeB',
-              '618384_2022-04-14_15-11-00_ProbeB',
-              '621362_2022-07-14_11-19-36_ProbeA'],
-    "ibl": ['CSHZAD026_2020-09-04_probe00',
-            'CSHZAD029_2020-09-09_probe00',
-            'SWC054_2020-10-05_probe00',
-            'SWC054_2020-10-05_probe01'],
-    "mindscope": ['754312389_probe756781559',
-                  '766640955_probe773592324',
-                  '829720705_probe832129157',
-                  '839557629_probe846401838']
+    "aind-np2-1": ['595262_2022-02-21_15-18-07_ProbeA',
+                   '602454_2022-03-22_16-30-03_ProbeB',
+                   '612962_2022-04-13_19-18-04_ProbeB',
+                   '612962_2022-04-14_17-17-10_ProbeC',],
+    "aind-np2-2": ['618197_2022-06-21_14-08-06_ProbeC',
+                   '618318_2022-04-13_14-59-07_ProbeB',
+                   '618384_2022-04-14_15-11-00_ProbeB',
+                   '621362_2022-07-14_11-19-36_ProbeA'],
+    "aind-np1": ['605642_2022-03-11_16-03-34_ProbeA',
+                 '613482_2022-06-16_17-49-19_ProbeA',
+                 '625749_2022-08-03_15-15-63_ProbeA',
+                 '625749_2022-08-03_15-15-63_ProbeA'],
+    "ibl-np1": ['CSHZAD026_2020-09-04_probe00',
+                'CSHZAD029_2020-09-09_probe00',
+                'SWC054_2020-10-05_probe00',
+                'SWC054_2020-10-05_probe01'],
+    # "mindscope-np1": ['754312389_probe756781559',
+    #                   '766640955_probe773592324',
+    #                   '829720705_probe832129157',
+    #                   '839557629_probe846401838']
 
 }
-all_dsets = ["aind1", "aind2", "ibl", "mindscope"]
+all_dsets = ["aind-np2-1", "aind-np2-2", "ibl-np1", "aind-np1"] # "mindscope-np1"]
 
 # Define compressions
 blosc_compressors = ['blosc-lz4', 'blosc-lz4hc', 'blosc-zlib', 'blosc-zstd']
@@ -109,9 +113,10 @@ n_jobs = 12
 job_kwargs = {'n_jobs': n_jobs, "verbose": False, "progress_bar": True}
 
 # define LSB correction options
-lsb_corrections = {"ibl": {'none': False},  # spikeGLX is already "LSB-corrected"
-                   "aind": {'false': False, 'true': True},
-                   "mindscope": {'false': False, 'true': True}}
+lsb_corrections = {"ibl-np1": {'none': False},  # spikeGLX is already "LSB-corrected"
+                   "aind-np2": {'false': False, 'true': True},
+                   "aind-np1": {'false': False, 'true': True},
+                   "mindscope-np1": {'false': False, 'true': True}}
 subset_columns = ["session", "dataset", "compressor", "compressor_type", "chunk_duration",
                   "level", "shuffle", "lsb", "probe", "channel_chunk_size"]
 
@@ -161,9 +166,12 @@ if __name__ == "__main__":
 
     # check if the ephys data is available
     for dset in dsets:
-        if "aind" in dset:
+        if "aind-np2" in dset:
             probe_name = "Neuropixels2.0"
-            dset_name = "aind"
+            dset_name = "aind-np2"
+        elif "aind-np1" in dset:
+            probe_name = "Neuropixels2.0"
+            dset_name = "aind-np1"
         else:
             probe_name = "Neuropixels1.0"
             dset_name = dset
