@@ -22,9 +22,6 @@ The final datasets are uploaded in the "s3://aind-ephys-compression-benchmark-da
 
 ** mindscope data is preprocessed, so it will not be used for benchmarking
 """
-
-from utils import get_oe_stream, gs_download_folder, gs_upload_folder, \
-    s3_download_public_file, s3_download_public_folder
 from pathlib import Path
 import shutil
 import numpy as np
@@ -38,7 +35,7 @@ import sys
 
 sys.path.append("..")
 
-from utils import gs_download_folder, gs_upload_folder, s3_download_public_folder, s3_download_folder, s3_upload_folder
+from utils import s3_download_public_folder, s3_download_folder, s3_upload_folder
 
 ephys_compression_folder_path = Path(__file__).parent.parent
 

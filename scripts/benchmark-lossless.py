@@ -141,6 +141,8 @@ if __name__ == "__main__":
         dsets = all_dsets
         comp_types = all_compressor_types
 
+    print(f"Benchmarking:\n\tDatasets: {dsets}\n\tCompressor types: {comp_types}")
+
     compressors = []
     if "blosc" in comp_types:
         compressors += blosc_compressors
