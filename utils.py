@@ -78,7 +78,7 @@ def is_entry(csv_file, entry, subset_columns=None):
         return False
 
 
-def append_to_csv(csv_file, new_entry, subset_columns=None):
+def append_to_csv(csv_file, new_entry, subset_columns=None, verbose=False):
     """Appends a new entry to a CSV file.
 
     Parameters
@@ -89,19 +89,21 @@ def append_to_csv(csv_file, new_entry, subset_columns=None):
         The new entry dictionary to add
     subset_columns : list, optional
         List of str to only check a subset of columns, by default None
+    verbose : bool
+        If True, it prints whether the new entry was successfull, by default False
     """
     new_df = None
     if csv_file.is_file():
         df_benchmark = pd.read_csv(csv_file, index_col=False)
         if not is_entry(csv_file, new_entry, subset_columns):
-            print("Adding new row to csv")
             new_data_arr = {k: [v] for k, v in new_entry.items()}
             new_df = pd.concat([df_benchmark, pd.DataFrame(new_data_arr)])
     else:
-        print("Adding new row to csv")
         new_data_arr = {k: [v] for k, v in new_entry.items()}
         new_df = pd.DataFrame(new_data_arr)
     if new_df is not None:
+        if verbose:
+            print("Adding new row to csv")
         new_df.to_csv(csv_file, index=False)
 
 
