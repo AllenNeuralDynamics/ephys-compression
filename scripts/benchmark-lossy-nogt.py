@@ -13,7 +13,7 @@ to the data folder.
 Different datasets (aind1, aind2, ibl, mindscope) can be run in parallel by passing them as an argument (or using the 
 "App Panel").
 """
-
+import os
 import time
 from pathlib import Path
 import shutil
@@ -41,7 +41,9 @@ data_folder = Path("../data")
 results_folder = Path("../results")
 scratch_folder = Path("../scratch")
 
-job_kwargs = dict(n_jobs=16, chunk_duration="1s", progress_bar=True)
+n_jobs = None
+job_kwargs = dict(n_jobs=n_jobs if n_jobs is not None else os.cpu_count(),
+                  chunk_duration="1s", progress_bar=False, verbose=False)
 ks25_sorter_params = job_kwargs
 time_range_rmse = [15, 20]
 
@@ -92,7 +94,7 @@ auto_curation_query = (f"isi_violations_ratio < {isi_viol_threshold} and "
 sorting_outputs_folder = results_folder / "sortings"
 sorting_outputs_folder.mkdir()
 
-strategies = ["bit_truncation", "wavpack"]
+all_strategies = ["bit_truncation", "wavpack"]
 
 # define options for bit truncation
 zarr_clevel = 9
@@ -107,13 +109,22 @@ subset_columns = ["dset", "session", "strategy", "factor", "probe"]
 
 if __name__ == "__main__":
 
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 3:
         if sys.argv[1] == "all":
             dsets = all_dsets
         else:
-            dsets = [sys.argv[1]]
+            dset = str(sys.argv[1])
+            assert dset in all_dsets, "Invalid dataset!"
+            dsets = [dset]
+        if sys.argv[2] == "all":
+            strategies = all_strategies
+        else:
+            strategy = str(sys.argv[2])
+            assert strategy in all_strategies, "Invalid strategy!"
+            strategies = [strategy]
     else:
         dsets = all_dsets
+        strategies = all_strategies
 
     ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
@@ -129,62 +140,50 @@ if __name__ == "__main__":
     tmp_folder.mkdir(exist_ok=True, parents=True)
 
     for dset in dsets:
-        print(f"\n\nProcessing dataset {dset}\n\n") 
-
-        benchmark_file = results_folder / f"benchmark-lossy-nogt-{dset}.csv"
-
-        if benchmark_file.is_file():
-            df = pd.read_csv(benchmark_file, index_col=False)
-            print(f"Entries in results: {len(df)}")
-        else:
-            df = None
-
+        print(f"\nProcessing dataset {dset}")
         t_start_dset = time.perf_counter()
 
-        for session in sessions[dset]:
-            print(f"\nBenchmarking {session}\n\n")
+        if "aind-np2" in dset:
+            probe_name = "Neuropixels2.0"
+            dset_name = "aind-np2"
+        elif "aind-np1" in dset:
+            probe_name = "Neuropixels1.0"
+            dset_name = "aind-np1"
+        else:
+            probe_name = "Neuropixels1.0"
+            dset_name = dset
 
-            t_start_session = time.perf_counter()
-            
-            if "aind-np2" in dset:
-                probe_name = "Neuropixels2.0"
-                dset_name = "aind-np2"
-            elif "aind-np1" in dset:
-                probe_name = "Neuropixels2.0"
-                dset_name = "aind-np1"
+        for strategy in strategies:
+            print(f"Benchmarking {strategy}: {factors[strategy]}")
+            t_start_strategy = time.perf_counter()
+            benchmark_file = results_folder / f"benchmark-lossy-nogt-{dset}-{strategy}.csv"
+
+            if benchmark_file.is_file():
+                df = pd.read_csv(benchmark_file, index_col=False)
             else:
-                probe_name = "Neuropixels1.0"
-                dset_name = dset
+                df = None
 
-            rec = si.load_extractor(ephys_benchmark_folder / dset_name / session)
-            print(rec)    
-            
-            dur = rec.get_num_samples() / rec.get_sampling_frequency()
-            dtype = rec.get_dtype()
-            gain = rec.get_channel_gains()[0]
-            
-            rec_to_compress = None
+            for session in sessions[dset]:
+                t_start_session = time.perf_counter()
+                rec = si.load_extractor(ephys_benchmark_folder / dset_name / session)
+                dur = rec.get_total_duration()
+                print(f"\tBenchmarking {session} - duration {dur}s\n")
+                dtype = rec.get_dtype()
+                gain = rec.get_channel_gains()[0]
 
-            num_channels = rec.get_num_channels()
-            fs = rec.get_sampling_frequency()
-            
-            full_size = rec.get_dtype().itemsize * rec.get_num_samples() * rec.get_num_channels()
+                rec_to_compress = None
+                num_channels = rec.get_num_channels()
+                fs = rec.get_sampling_frequency()
 
-            zarr_root = session
-
-            for strategy in strategies:
-                print(f"Benchmarking {strategy}: {factors[strategy]}")
+                zarr_root = session
                 for factor in factors[strategy]:
-                    t_start_factor = time.perf_counter()
-
-                    print(f"Compression factor {factor}")
                     entry_data = {"probe": probe_name, "strategy": strategy, "factor": factor, 
                                   "dataset": dset_name, "session": session}
                     rec_name = f"{dset_name}-{session}-{strategy}-{factor}"
 
                     if not is_entry(benchmark_file, entry_data):
-                        print(f"Compression: {rec_name}")
-                        if dset_name != "ibl":
+                        print(f"\t\t{rec_name}")
+                        if "ibl" not in dset_name:
                             if rec_to_compress is None:
                                 rec_to_compress = spre.correct_lsb(rec)
                         else:
@@ -206,8 +205,7 @@ if __name__ == "__main__":
                             benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, 
                                                         filters=filters, time_range_rmse=time_range_rmse,
                                                         **job_kwargs)
-                        print(f"Compression {rec_name}: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
-
+                        print(f"\t\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
 
                         new_data = {"dataset": dset_name, "session": session , "probe": probe_name, "strategy": strategy, 
                                     "factor": factor, "CR": cr, "cspeed_xrt": cspeed_xrt, 
@@ -222,9 +220,8 @@ if __name__ == "__main__":
                         rec_zarr_f = spre.bandpass_filter(rec_zarr)
                         rec_zarr_cmr = spre.common_reference(rec_zarr_f)
                         
-                        print(f"Spike sorting: {rec_name}")
                         sorting = ss.run_sorter(sorter, rec_zarr_cmr, output_folder=raw_sorting_output_folder,
-                                                verbose=True, **sorter_params)
+                                                verbose=False, **sorter_params)
                         sorting = sorting.remove_empty_units()
                         # remove duplicated spikes
                         sorting = scur.remove_redundant_units(sorting, duplicate_threshold=0.9, align=False,
@@ -240,13 +237,11 @@ if __name__ == "__main__":
                         new_data["n_raw_units"] = len(sorting_saved.unit_ids)
                         new_data["n_ks_good_units"] = len(sorting_good.unit_ids)
 
-                        print(f"Spike sorting {rec_name}: num units - {len(sorting.unit_ids)} num KS good units "
+                        print(f"\t\t\tSpike sorting: num units - {len(sorting.unit_ids)} num KS good units "
                               f"- {len(sorting_good.unit_ids)}\n")
 
                     
                         # run auto-curation
-                        print(f"Curation: {rec_name}")
-
                         sorting_curated_path = sorting_outputs_folder / dset_name / f"sorting_{rec_name}_curated"
                     
                         wf_path = tmp_folder / f"waveforms_raw_{dset_name}_{session}"
@@ -262,35 +257,33 @@ if __name__ == "__main__":
                         new_data["n_curated_good_units"] = len(sorting_curated.unit_ids)
                         new_data["n_curated_bad_units"] = len(sorting.unit_ids) - len(sorting_curated.unit_ids)
 
-                        print(f"Curation {rec_name}: num units - {len(sorting.unit_ids)} num auto-curated units "
+                        print(f"\t\t\tCuration: num units - {len(sorting.unit_ids)} num auto-curated units "
                               f"{len(sorting_curated.unit_ids)}\n")
 
                         append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
-                        print(f"\nSummary {rec_name}:\n")
-                        print(f"Compression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
-                        print(f"Spike sorting: num units - {len(sorting.unit_ids)} num KS good units - "
+                        print(f"\n\t\tSummary {rec_name}:\n")
+                        print(f"\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
+                        print(f"\t\tSpike sorting: num units - {len(sorting.unit_ids)} num KS good units - "
                               f"{len(sorting_good.unit_ids)}\n")
-                        print(f"Curation: num auto-curated units {len(sorting_curated.unit_ids)}\n")
+                        print(f"\t\tCuration: num auto-curated units {len(sorting_curated.unit_ids)}\n")
                         # clean up
                         shutil.rmtree(zarr_path)
                         shutil.rmtree(wf_path)
                         del we
+                t_stop_session = time.perf_counter()
+                elapsed_session = np.round(t_stop_session - t_start_session)
+                print(f"\n\t\tElapsed time session: {elapsed_session}s")
 
-                    else:
-                        print(f"{rec_name} already computed")
-                    t_stop_factor = time.perf_counter()
-                    elapsed_factor = np.round(t_stop_factor - t_start_factor)
-                    print(f"Elapsed time {strategy}-{factor}: {elapsed_factor}s")
-            t_stop_session = time.perf_counter()
-            elapsed_session = np.round(t_stop_session - t_start_session)
-            print(f"Elapsed time session: {elapsed_session}s")
+            df = pd.read_csv(benchmark_file, index_col=False)
+            print(f"Final # entries in results for {strategy}: {len(df)}")
+
+            t_stop_strategy = time.perf_counter()
+            elapsed_strategy = np.round(t_stop_strategy - t_start_strategy)
+            print(f"\n\tElapsed time strategy: {elapsed_strategy}s")
         t_stop_dset = time.perf_counter()
         elapsed_dset = np.round(t_stop_dset - t_start_dset)
-        print(f"Elapsed time dataset: {elapsed_dset}s")
+        print(f"\nElapsed time dataset: {elapsed_dset}s")
 
     # final cleanup
     shutil.rmtree(tmp_folder)
-            
-    df = pd.read_csv(benchmark_file, index_col=False)
-    print(f"Final # entries in results: {len(df)}")

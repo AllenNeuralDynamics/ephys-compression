@@ -41,7 +41,7 @@ scratch_folder = Path("../scratch")
 
 n_jobs = None
 job_kwargs = dict(n_jobs=n_jobs if n_jobs is not None else os.cpu_count(),
-                  chunk_duration="1s", progress_bar=False)
+                  chunk_duration="1s", progress_bar=False, verbose=False)
 ks25_sorter_params = job_kwargs
 time_range_rmse = [15, 20]
 
@@ -88,6 +88,7 @@ if __name__ == "__main__":
             strategies = [strategy]
     else:
         dsets = all_dsets
+        strategies = all_strategies
 
     ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
@@ -107,7 +108,6 @@ if __name__ == "__main__":
         t_start_all = time.perf_counter()
 
         rec, sort_gt= se.read_mearec(rec_file)
-        print(rec)
         
         if dset == "NP1":
             probe_name = "Neuropixels1.0"
@@ -128,12 +128,12 @@ if __name__ == "__main__":
         zarr_root = f"{rec_file.stem}"
 
         for strategy in strategies:
-            print(f"Benchmarking {strategy}: {factors[strategy]}\n")
+            print(f"\nBenchmarking {strategy}: {factors[strategy]}\n")
 
-            print("\n\nCOMPRESSION\n\n")
+            print("\nCOMPRESSION")
             benchmark_file = results_folder / f"benchmark-lossy-gt-{dset}-{strategy}.csv"
             for factor in factors[strategy]:
-                print(f"\t\tCompression factor {factor}")
+                print(f"\tCompression factor {factor}")
                 entry_data = {"probe": probe_name, "strategy": strategy, "factor": factor}
 
                 if not is_entry(benchmark_file, entry_data):
@@ -159,17 +159,17 @@ if __name__ == "__main__":
                                 "cspeed_xrt": cspeed_xrt, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute())}
                     append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
-                    print(f"\t\tElapsed time {strategy}-{factor}: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}")
+                    print(f"\tElapsed time {cspeed}s: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}")
 
             df = pd.read_csv(benchmark_file, index_col=False)
 
-            print("\n\nTEMPLATE METRICS\n")
+            print("\nTEMPLATE METRICS")
             template_metrics = spost.get_template_metric_names()
             benchmark_wfs_file = results_folder / f"benchmark-lossy-gt-wfs-{dset}-{strategy}.csv"
             waveforms_folder = results_folder / f"waveforms-{dset}-{strategy}"
             waveforms_folder.mkdir(exist_ok=True, parents=True)
 
-            print(f"\t\tExtracting GT waveforms")
+            print(f"\tExtracting GT waveforms")
             rec_gt = gt_dict[dset]["rec_gt"]
             sort_gt = gt_dict[dset]["sort_gt"]
             rec_gt_f = spre.bandpass_filter(rec_gt)
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                                                         channel_ids=we_gt.channel_ids,
                                                         unit_id_to_channel_ids=unit_id_to_channel_ids))
 
-            print(f"\t\tComputing GT template metrics")
+            print(f"\tComputing GT template metrics")
             df_tm = spost.compute_template_metrics(we_gt, upsampling_factor=10,
                                                 sparsity=sparsity)
             df_tm["probe"] = [probe_name] * len(df_tm)
@@ -235,14 +235,14 @@ if __name__ == "__main__":
                 rec_zarr = si.read_zarr(zarr_path)
                 rec_zarr_f = spre.bandpass_filter(rec_zarr)
 
-                print(f"\t\tLossy waveforms for {strategy}-{factor}")
+                print(f"\tLossy waveforms for {strategy}-{factor}")
                 we_lossy_path = waveforms_folder / f"wf_lossy_{strategy}_{factor}"
                 # compute waveforms
                 we_lossy = si.extract_waveforms(rec_zarr_f, sort_gt, folder=we_lossy_path,
                                                 ms_after=ms_after, precompute_template=('average', 'std'),
                                                 seed=seed, use_relative_path=True, **job_kwargs)
                 # compute features
-                print(f"\t\tComputing lossy template metrics")
+                print(f"\tComputing lossy template metrics")
                 df_tm_lossy = spost.compute_template_metrics(we_lossy, upsampling_factor=10,
                                                             sparsity=sparsity)
                 df_tm_lossy["probe"] = [probe_name] * len(df_tm_lossy)
@@ -275,7 +275,7 @@ if __name__ == "__main__":
             # update csv
             df_tm.to_csv(benchmark_wfs_file, index=False)
 
-            print(f"\n\nSPIKE SORTING\n\n")
+            print(f"\nSPIKE SORTING STUDY")
             gt_study_dict = {}
             study_folder = tmp_folder / f"study_{dset}"
             sort_gt = gt_dict[dset]["sort_gt"]
@@ -288,15 +288,16 @@ if __name__ == "__main__":
                 rec_zarr_f = spre.bandpass_filter(rec_zarr)
                 gt_study_dict[f"{strategy}_{factor}"] = (rec_zarr_f, sort_gt)
 
-            print(f"\t\tGT study recordings: {list(gt_study_dict.keys())}")
+            print(f"\tGT study recordings: {list(gt_study_dict.keys())}")
             study = sc.GroundTruthStudy.create(study_folder, gt_study_dict, **job_kwargs)
 
+            print(f"\tRunning spike sorting jobs")
             sorter_list = ["kilosort2_5"]
             sorter_params = dict(kilosort_2_5=ks25_sorter_params)
             study.run_sorters(sorter_list, mode_if_folder_exists="keep", verbose=True,
                             sorter_params=sorter_params, remove_sorter_folders=True)
 
-            print("\t\tRunning comparisons")
+            print("\tRunning comparisons")
             study.run_comparisons(exhaustive_gt=True, verbose=False)
             dataframes = study.aggregate_dataframes()
             perf_by_unit = dataframes["perf_by_unit"]
@@ -309,7 +310,8 @@ if __name__ == "__main__":
                 rec_split = rec_name.split("_")
                 factor = rec_split[-1]
                 strategy = "_".join(rec_split[:-1])
-                index = df.query(f"probe == '{probe_name}' and factor == {factor} and strategy == '{strategy}'").index[0]
+                index = df.query(f"probe == '{probe_name}' and factor == {factor} "
+                                 f"and strategy == '{strategy}'").index[0]
                 perf = perf_by_unit.query(f"rec_name == '{rec_name}'")
                 for metric in perf_columns:
                     avg = perf[metric].values.mean()

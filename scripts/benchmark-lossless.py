@@ -212,7 +212,7 @@ if __name__ == "__main__":
                 dtype = None
 
                 for cname in compressors:
-                    print(f"\tCOMPRESSOR: {cname}")
+                    print(f"COMPRESSOR: {cname}")
                     if cname in blosc_compressors:
                         compressor_type = "blosc"
                         levels_compressor = levels[compressor_type]
@@ -239,9 +239,9 @@ if __name__ == "__main__":
                                                       "channel_chunk_size": channel_chunk_size}
 
                                         if not is_entry(benchmark_file, entry_data):
-                                            print(f"\n\t\tcompressor {cname} - level {level_name} "
-                                                  f"chunk dur - {chunk_dur} shuffle {shuffle_name} - lsb {lsb_str} - "
-                                                  f"channel_chunk_size {channel_chunk_size}")
+                                            print(f"\n\tCompressor {cname}: level {level_name} "
+                                                  f"chunk duration - {chunk_dur} shuffle {shuffle_name} - "
+                                                  f"lsb {lsb_str} - channel_chunk_size {channel_chunk_size}")
                                             # download only if needed
                                             if rec is None:
                                                 if ephys_benchmark_folder is None:
@@ -341,7 +341,7 @@ if __name__ == "__main__":
                                                     "duration": dur, "dtype": dtype, "compressor": cname,
                                                     "level": level_name, "shuffle": shuffle_name, "lsb": lsb_str,
                                                     "chunk_duration": chunk_dur, "CR": cr,
-                                                    "C-speed": compression_elapsed_time, 
+                                                    "C-speed": compression_elapsed_time,
                                                     "compressor_type": compressor_type,
                                                     "D-1s": decompression_1s_elapsed_time,
                                                     "D-10s": decompression_10s_elapsed_time, "cspeed_xrt": cspeed_xrt,
@@ -349,7 +349,7 @@ if __name__ == "__main__":
                                                     "dspeed1s_xrt": decompression_1s_rt,
                                                     "channel_chunk_size": channel_chunk_size}
                                             append_to_csv(benchmark_file, data, subset_columns=subset_columns)
-                                            print(f"\t\tCompression took {compression_elapsed_time}s - CR={cr} - "
+                                            print(f"\t--> elapsed time {compression_elapsed_time}s - CR={cr} - "
                                                   f"cspeed_xrt={cspeed_xrt} - dspeed10s_xrt={decompression_10s_rt}")
                                             # remove tmp path
                                             shutil.rmtree(zarr_path)
