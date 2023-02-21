@@ -168,10 +168,13 @@ if __name__ == "__main__":
         sort_gt = gt_dict[dset]["sort_gt"]
         rec_gt_f = spre.bandpass_filter(rec_gt)
         
-        we_gt_path = waveforms_folder / f"wf_gt"
+        we_gt_path = waveforms_folder / "wf_gt"
+        # cache sorting for disk persistence
+        sort_gt_path = waveforms_folder / "sort_gt"
+        sort_gt = sort_gt.save(folder=sort_gt_path)
         we_gt = si.extract_waveforms(rec_gt_f, sort_gt, folder=we_gt_path, 
                                      ms_after=ms_after, precompute_template=('average', 'std'),
-                                     seed=seed, **job_kwargs)
+                                     seed=seed, use_relative_path=True, **job_kwargs)
         # find channels for each "GT" unit
         extremum_channels = si.get_template_extremum_channel(we_gt)
         rec_locs = rec_gt.get_channel_locations()
@@ -231,7 +234,7 @@ if __name__ == "__main__":
             # compute waveforms
             we_lossy = si.extract_waveforms(rec_zarr_f, sort_gt, folder=we_lossy_path,
                                             ms_after=ms_after, precompute_template=('average', 'std'),
-                                            seed=seed, **job_kwargs)
+                                            seed=seed, use_relative_path=True, **job_kwargs)
             # compute features
             print(f"Calculating template metrics for {strategy}-{factor}")
             df_tm_lossy = spost.compute_template_metrics(we_lossy, upsampling_factor=10,
