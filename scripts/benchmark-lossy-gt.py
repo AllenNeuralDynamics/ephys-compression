@@ -294,8 +294,8 @@ if __name__ == "__main__":
             print(f"\tRunning spike sorting jobs")
             sorter_list = ["kilosort2_5"]
             sorter_params = dict(kilosort_2_5=ks25_sorter_params)
-            study.run_sorters(sorter_list, mode_if_folder_exists="keep", verbose=True,
-                            sorter_params=sorter_params, remove_sorter_folders=True)
+            study.run_sorters(sorter_list, mode_if_folder_exists="keep", verbose=False,
+                              sorter_params=sorter_params, remove_sorter_folders=True)
 
             print("\tRunning comparisons")
             study.run_comparisons(exhaustive_gt=True, verbose=False)
