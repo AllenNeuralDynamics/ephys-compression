@@ -133,7 +133,6 @@ if __name__ == "__main__":
             print("\nCOMPRESSION")
             benchmark_file = results_folder / f"benchmark-lossy-gt-{dset}-{strategy}.csv"
             for factor in factors[strategy]:
-                print(f"\tCompression factor {factor}")
                 entry_data = {"probe": probe_name, "strategy": strategy, "factor": factor}
 
                 if not is_entry(benchmark_file, entry_data):
@@ -159,7 +158,8 @@ if __name__ == "__main__":
                                 "cspeed_xrt": cspeed_xrt, "rmse": rmse, "rec_zarr_path": str(zarr_path.absolute())}
                     append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
-                    print(f"\tElapsed time {cspeed}s: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}")
+                    print(f"\tCompression factor {factor}: elapsed time {cspeed}s: "
+                          f"CR: {cr} - cspeed xrt - {cspeed_xrt} - rmse: {rmse}")
 
             df = pd.read_csv(benchmark_file, index_col=False)
 

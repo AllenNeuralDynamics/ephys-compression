@@ -221,7 +221,7 @@ if __name__ == "__main__":
                         rec_zarr_cmr = spre.common_reference(rec_zarr_f)
                         
                         sorting = ss.run_sorter(sorter, rec_zarr_cmr, output_folder=raw_sorting_output_folder,
-                                                verbose=False, **sorter_params)
+                                                **sorter_params)
                         sorting = sorting.remove_empty_units()
                         # remove duplicated spikes
                         sorting = scur.remove_redundant_units(sorting, duplicate_threshold=0.9, align=False,
