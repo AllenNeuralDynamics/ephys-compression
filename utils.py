@@ -58,17 +58,17 @@ def is_entry(csv_file, entry, subset_columns=None):
 
         query = ""
         data_keys = list(entry.keys())
-        query_idx = 0
-        for i, k in enumerate(data_keys):
+        for k in data_keys:
             if k in subset_columns:
                 v = entry[k]
                 if isinstance(v, str):
                     query += f"{k} == '{v}'"
                 else:
                     query += f"{k} == {v}"
-                if query_idx < len(subset_columns) - 1:
-                    query += " and "
-                query_idx += 1
+                query += " and "
+        # remove final 'and'
+        if query.endswith("and "):
+            query = query[:-4]
 
         if len(df.query(query)) == 0:
             return False
@@ -325,7 +325,7 @@ def s3_download_folder(bucket, remote_folder, destination):
         bucket += "/"
     src = f"{bucket}{remote_folder}"
 
-    os.system(f"aws s3 cp {src} {dst} --recursive")
+    os.system(f"aws s3 sync {src} {dst}")
 
 
 def s3_upload_folder(bucket, remote_folder, local_folder):

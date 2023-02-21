@@ -96,9 +96,8 @@ for session, session_data in aind_np2_sessions.items():
         if not session_folder.is_dir():
             dest = tmp_folder / dataset
             oe_folder = dest / session
-            if not oe_folder.is_dir():
-                print(f"Downloading {session}")
-                s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
+            print(f"Syncing {session}")
+            s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
 
             # clean (keep experiment1 only)
             record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][0]
@@ -179,9 +178,8 @@ for session, session_data in aind_np1_sessions.items():
         if not session_folder.is_dir():
             dest = tmp_folder / dataset
             oe_folder = dest / session
-            if not oe_folder.is_dir():
-                print(f"Downloading {session}")
-                s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
+            print(f"Syncing {session}")
+            s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
 
             # clean (keep experiment1 only)
             record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][0]
