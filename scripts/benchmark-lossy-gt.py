@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
             print("\nTEMPLATE METRICS")
             template_metrics = spost.get_template_metric_names()
-            benchmark_wfs_file = results_folder / f"benchmark-lossy-gt-wfs-{dset}-{strategy}.csv"
+            benchmark_waveforms_file = results_folder / f"benchmark-lossy-gt-waveforms-{dset}-{strategy}.csv"
             waveforms_folder = results_folder / f"waveforms-{dset}-{strategy}"
             waveforms_folder.mkdir(exist_ok=True, parents=True)
 
@@ -296,7 +296,7 @@ if __name__ == "__main__":
             del we_gt
 
             # update csv
-            df_tm.to_csv(benchmark_wfs_file, index=False)
+            df_tm.to_csv(benchmark_waveforms_file, index=False)
 
             print(f"\nSPIKE SORTING STUDY")
             gt_study_dict = {}
