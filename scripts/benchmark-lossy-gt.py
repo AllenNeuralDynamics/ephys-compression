@@ -88,11 +88,10 @@ if __name__ == "__main__":
             strategy = str(sys.argv[2])
             assert strategy in all_strategies, "Invalid strategy!"
             strategies = [strategy]
-        if sys.argv[3] == "all":
+        if float(sys.argv[3]) < 0:
             factors = None
         else:
-            factor = str(sys.argv[2])
-            factors = [factor]
+            factors = [float(sys.argv[3])]
     elif len(json_files) == 1:
         config_file = json_files[0]
         config = json.load(open(config_file, 'r'))
