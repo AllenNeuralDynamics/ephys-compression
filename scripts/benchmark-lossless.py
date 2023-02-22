@@ -135,7 +135,7 @@ if __name__ == "__main__":
         if sys.argv[3] == "all":
             compressors = all_compressors
         else:
-            compressors = [sys.argv[2]]
+            compressors = [sys.argv[3]]
     elif len(json_files) == 1:
         config_file = json_files[0]
         config = json.load(open(config_file, 'r'))
