@@ -156,9 +156,10 @@ dataset = "aind-np1"
 
 aind_np1_sessions = {
     "605642_2022-03-11_16-03-34": {"probe": "ProbeA"},
-    "613482_2022-06-16_17-49-19": {"probe": "ProbeA"},
-    "625749_2022-08-03_15-15-63": {"probe": "ProbeA"},
-    "634568_2022-08-05_15-59-46": {"probe": "ProbeA"}
+    "625749_2022-08-03_15-15-06": {"probe": "ProbeA"},
+    "634568_2022-08-05_15-59-46": {"probe": "ProbeA"},
+    "634569_2022-08-09_16-14-38": {"probe": "ProbeA"}
+    # "613482_2022-06-16_17-49-19": {"probe": "ProbeA-AP"},
 }
 
 
@@ -198,7 +199,8 @@ for session, session_data in aind_np1_sessions.items():
 
             # streams
             stream_names, stream_ids = se.get_neo_streams("openephys", oe_folder)
-            stream_name = [stream_name for stream_name in stream_names if session_data["probe"] in stream_name][0]
+            stream_name = [stream_name for stream_name in stream_names if session_data["probe"]
+                           in stream_name and "AP" in stream_name][0]
             stream_id = stream_ids[stream_names.index(stream_name)]
 
             # load recording
