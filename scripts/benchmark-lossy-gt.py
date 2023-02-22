@@ -148,7 +148,11 @@ if __name__ == "__main__":
                 factors_to_run = factors
             print(f"\nBenchmarking {strategy}: {factors_to_run}\n")
             print("\nCOMPRESSION")
-            for factor in factors_to_run[strategy]:
+            for factor in factors_to_run:
+                if strategy == "bit_truncation":
+                    factor = int(factor)
+                else:
+                    factor = float(factor)
                 # assert factor in all_factors[strategy], f"Factor {factor} is invalid for startegy {strategy}"
                 
                 benchmark_file = results_folder / f"benchmark-lossy-gt-{dset}-{strategy}-{factor}.csv"

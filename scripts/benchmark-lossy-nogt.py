@@ -177,6 +177,11 @@ if __name__ == "__main__":
             print(f"\nBenchmarking {strategy}: {factors_to_run}\n")
 
             for factor in factors_to_run:
+                if strategy == "bit_truncation":
+                    factor = int(factor)
+                else:
+                    factor = float(factor)
+
                 benchmark_file = results_folder / f"benchmark-lossy-nogt-{dset}-{strategy}-{factor}.csv"
 
                 if benchmark_file.is_file():
