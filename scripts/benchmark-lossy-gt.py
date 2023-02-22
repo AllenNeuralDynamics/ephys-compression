@@ -14,6 +14,7 @@ import os
 import time
 import shutil
 import sys
+import json
 
 from pathlib import Path
 import numpy as np
@@ -24,8 +25,6 @@ import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
 import spikeinterface.postprocessing as spost
 import spikeinterface.comparison as sc
-
-
 
 from numcodecs import Blosc
 from wavpack_numcodecs import WavPack
@@ -49,7 +48,10 @@ tmp_folder = scratch_folder / "tmp"
 tmp_folder.mkdir(exist_ok=True, parents=True)
 
 # COMPRESSION PARAMS #
+all_dsets = ["NP1", "NP2"]
 all_strategies = ["bit_truncation", "wavpack"]
+all_factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
+               "wavpack": [0, 6, 5, 4, 3.5, 3, 2.25]}
 
 # define options for bit truncation
 zarr_clevel = 9
@@ -57,8 +59,7 @@ zarr_compressor = Blosc(cname='zstd', clevel=zarr_clevel, shuffle=Blosc.BITSHUFF
 
 # define wavpack options
 wv_level = 3
-factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
-           "wavpack": [0, 6, 5, 4, 3.5, 3, 2.25]}
+
 
 # TEMPLATE METRICS PARAMS #
 dist_interval = 30
@@ -69,11 +70,12 @@ ms_after = 5
 
 subset_columns=["strategy", "factor", "probe"]
 
-all_dsets = ["NP1", "NP2"]
 
 if __name__ == "__main__":
+    # check if json files in data
+    json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
 
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         if sys.argv[1] == "all":
             dsets = all_dsets
         else:
@@ -86,9 +88,21 @@ if __name__ == "__main__":
             strategy = str(sys.argv[2])
             assert strategy in all_strategies, "Invalid strategy!"
             strategies = [strategy]
+        if sys.argv[3] == "all":
+            factors = None
+        else:
+            factor = str(sys.argv[2])
+            factors = [factor]
+    elif len(json_files) == 1:
+        config_file = json_files[0]
+        config = json.load(open(config_file, 'r'))
+        dsets = [config["dset"]]
+        strategies = [config["strategy"]]
+        factors = [config["factor"]]
     else:
         dsets = all_dsets
         strategies = all_strategies
+        factors = None
 
     ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
@@ -128,11 +142,16 @@ if __name__ == "__main__":
         zarr_root = f"{rec_file.stem}"
 
         for strategy in strategies:
-            print(f"\nBenchmarking {strategy}: {factors[strategy]}\n")
-
+            if factors is None:
+                factors_to_run = all_factors[strategy]
+            else:
+                factors_to_run = factors
+            print(f"\nBenchmarking {strategy}: {factors_to_run}\n")
             print("\nCOMPRESSION")
-            benchmark_file = results_folder / f"benchmark-lossy-gt-{dset}-{strategy}.csv"
-            for factor in factors[strategy]:
+            for factor in factors_to_run[strategy]:
+                # assert factor in all_factors[strategy], f"Factor {factor} is invalid for startegy {strategy}"
+                
+                benchmark_file = results_folder / f"benchmark-lossy-gt-{dset}-{strategy}-{factor}.csv"
                 entry_data = {"probe": probe_name, "strategy": strategy, "factor": factor}
 
                 if not is_entry(benchmark_file, entry_data):
@@ -203,7 +222,7 @@ if __name__ == "__main__":
 
             print(f"\tComputing GT template metrics")
             df_tm = spost.compute_template_metrics(we_gt, upsampling_factor=10,
-                                                sparsity=sparsity)
+                                                   sparsity=sparsity)
             df_tm["probe"] = [probe_name] * len(df_tm)
             df_tm["unit_id"] = df_tm.index.to_frame()["unit_id"].values
             df_tm["channel_id"] = df_tm.index.to_frame()["channel_id"].values

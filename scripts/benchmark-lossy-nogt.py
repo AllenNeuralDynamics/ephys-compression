@@ -20,6 +20,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import sys
+import json
 
 
 import spikeinterface as si
@@ -65,8 +66,6 @@ sessions = {
     #                   "829720705_probe832129157"]
 
 }
-all_dsets = ["aind-np2-1", "aind-np2-2", "ibl-np1", "aind-np1"] #"mindscope-np1"]
-
 
 # auto curation
 isi_viol_threshold = 0.5
@@ -94,7 +93,10 @@ auto_curation_query = (f"isi_violations_ratio < {isi_viol_threshold} and "
 sorting_outputs_folder = results_folder / "sortings"
 sorting_outputs_folder.mkdir()
 
+all_dsets = ["aind-np2-1", "aind-np2-2", "ibl-np1", "aind-np1"]
 all_strategies = ["bit_truncation", "wavpack"]
+all_factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
+               "wavpack": [0, 6, 5, 4, 3.5, 3, 2.25]}
 
 # define options for bit truncation
 zarr_clevel = 9
@@ -102,14 +104,15 @@ zarr_compressor = Blosc(cname='zstd', clevel=zarr_clevel, shuffle=Blosc.BITSHUFF
 
 # define wavpack options
 level = 3
-factors = {"bit_truncation": [0, 1, 2, 3, 4, 5, 6, 7],
-           "wavpack": [0, 6, 5, 4, 3.5, 3, 2.25]}
+
 
 subset_columns = ["dset", "session", "strategy", "factor", "probe"]
 
 if __name__ == "__main__":
+# check if json files in data
+    json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
 
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         if sys.argv[1] == "all":
             dsets = all_dsets
         else:
@@ -122,9 +125,21 @@ if __name__ == "__main__":
             strategy = str(sys.argv[2])
             assert strategy in all_strategies, "Invalid strategy!"
             strategies = [strategy]
+        if sys.argv[3] == "all":
+            factors = None
+        else:
+            factor = str(sys.argv[2])
+            factors = [factor]
+    elif len(json_files) == 1:
+        config_file = json_files[0]
+        config = json.load(open(config_file, 'r'))
+        dsets = [config["dset"]]
+        strategies = [config["strategy"]]
+        factors = [config["factor"]]
     else:
         dsets = all_dsets
         strategies = all_strategies
+        factors = None
 
     ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
@@ -154,29 +169,34 @@ if __name__ == "__main__":
             dset_name = dset
 
         for strategy in strategies:
-            print(f"Benchmarking {strategy}: {factors[strategy]}")
             t_start_strategy = time.perf_counter()
-            benchmark_file = results_folder / f"benchmark-lossy-nogt-{dset}-{strategy}.csv"
-
-            if benchmark_file.is_file():
-                df = pd.read_csv(benchmark_file, index_col=False)
+            if factors is None:
+                factors_to_run = all_factors[strategy]
             else:
-                df = None
+                factors_to_run = factors
+            print(f"\nBenchmarking {strategy}: {factors_to_run}\n")
 
-            for session in sessions[dset]:
-                t_start_session = time.perf_counter()
-                rec = si.load_extractor(ephys_benchmark_folder / dset_name / session)
-                dur = rec.get_total_duration()
-                print(f"\tBenchmarking {session} - duration {dur}s\n")
-                dtype = rec.get_dtype()
-                gain = rec.get_channel_gains()[0]
+            for factor in factors_to_run:
+                benchmark_file = results_folder / f"benchmark-lossy-nogt-{dset}-{strategy}-{factor}.csv"
 
-                rec_to_compress = None
-                num_channels = rec.get_num_channels()
-                fs = rec.get_sampling_frequency()
+                if benchmark_file.is_file():
+                    df = pd.read_csv(benchmark_file, index_col=False)
+                else:
+                    df = None
 
-                zarr_root = session
-                for factor in factors[strategy]:
+                for session in sessions[dset]:
+                    t_start_session = time.perf_counter()
+                    rec = si.load_extractor(ephys_benchmark_folder / dset_name / session)
+                    dur = rec.get_total_duration()
+                    print(f"\tBenchmarking {session} - duration {dur}s\n")
+                    dtype = rec.get_dtype()
+                    gain = rec.get_channel_gains()[0]
+
+                    rec_to_compress = None
+                    num_channels = rec.get_num_channels()
+                    fs = rec.get_sampling_frequency()
+
+                    zarr_root = session                
                     entry_data = {"probe": probe_name, "strategy": strategy, "factor": factor, 
                                   "dataset": dset_name, "session": session}
                     rec_name = f"{dset_name}-{session}-{strategy}-{factor}"
