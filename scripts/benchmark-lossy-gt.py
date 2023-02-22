@@ -112,9 +112,10 @@ if __name__ == "__main__":
     print(f"spikeinterface version: {si.__version__}")
 
     df = None
+    print(f"\nUsing datasets: {dsets}")
 
     gt_dict = {}
-    for dset in all_dsets:
+    for dset in dsets:
         rec_file = [p for p in (ephys_benchmark_folder / "mearec").iterdir() if p.suffix == ".h5" and dset in p.name][0]
 
         print(f"\n\nBenchmarking {rec_file.name}\n")
