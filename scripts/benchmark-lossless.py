@@ -154,6 +154,7 @@ if __name__ == "__main__":
 
     # check if the ephys data is available
     for dset in dsets:
+        t_start_dset = time.perf_counter()
         if "aind-np2" in dset:
             probe_name = "Neuropixels2.0"
             dset_name = "aind-np2"
@@ -185,7 +186,7 @@ if __name__ == "__main__":
                 # loop over sessions in dataset
                 for session in sessions[dset]:
                     print(f"\nBenchmarking session: {session}\n")
-                    t_start_all = time.perf_counter()
+                    t_start_session = time.perf_counter()
 
                     rec = None
                     rec_lsb = None
@@ -323,3 +324,9 @@ if __name__ == "__main__":
                                                 f"cspeed_xrt={cspeed_xrt} - dspeed10s_xrt={decompression_10s_rt}")
                                         # remove tmp path
                                         shutil.rmtree(zarr_path)
+                    t_stop_session = time.perf_counter()
+                    elapsed_time_session = np.round(t_stop_session - t_start_session, 3)
+                    print(f"Elapsed time session {session}: {elapsed_time_session}s")
+        t_stop_dset = time.perf_counter()
+        elapsed_time_dset = np.round(t_stop_dset - t_start_dset, 3)
+        print(f"Elapsed time dset {dset}: {elapsed_time_dset}s")
