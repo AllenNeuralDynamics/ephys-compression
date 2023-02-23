@@ -197,11 +197,11 @@ if __name__ == "__main__":
             sort_gt = gt_dict[dset]["sort_gt"]
             rec_gt_f = spre.bandpass_filter(rec_gt)
             
-            we_gt_path = waveforms_folder / "wf_gt"
+            waveforms_gt_path = results_folder / "gt" / "waveforms"
             # cache sorting for disk persistence
-            sort_gt_path = waveforms_folder / "sort_gt"
-            sort_gt = sort_gt.save(folder=sort_gt_path)
-            we_gt = si.extract_waveforms(rec_gt_f, sort_gt, folder=we_gt_path, 
+            sorting_gt_path = results_folder / "gt" / "sorting"
+            sort_gt = sort_gt.save(folder=sorting_gt_path)
+            we_gt = si.extract_waveforms(rec_gt_f, sort_gt, folder=waveforms_gt_path,
                                          ms_after=ms_after, precompute_template=('average', 'std'),
                                          seed=seed, use_relative_path=True, **job_kwargs)
             # find channels for each "GT" unit
