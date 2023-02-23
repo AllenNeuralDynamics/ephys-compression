@@ -59,20 +59,15 @@ sessions = {
                    '618384_2022-04-14_15-11-00_ProbeB',
                    '621362_2022-07-14_11-19-36_ProbeA'],
     "aind-np1": ['605642_2022-03-11_16-03-34_ProbeA',
-                 '613482_2022-06-16_17-49-19_ProbeA',
                  '625749_2022-08-03_15-15-06_ProbeA',
-                 '634568_2022-08-05_15-59-46_ProbeA'],
+                 '634568_2022-08-05_15-59-46_ProbeA',
+                 '634569_2022-08-09_16-14-38_ProbeA'],
     "ibl-np1": ['CSHZAD026_2020-09-04_probe00',
                 'CSHZAD029_2020-09-09_probe00',
                 'SWC054_2020-10-05_probe00',
-                'SWC054_2020-10-05_probe01'],
-    # "mindscope-np1": ['754312389_probe756781559',
-    #                   '766640955_probe773592324',
-    #                   '829720705_probe832129157',
-    #                   '839557629_probe846401838']
-
+                'SWC054_2020-10-05_probe01']
 }
-all_dsets = ["aind-np2-1", "aind-np2-2", "ibl-np1", "aind-np1"] # "mindscope-np1"]
+all_dsets = ["aind-np2-1", "aind-np2-2", "ibl-np1", "aind-np1"]
 
 # Define compressions
 blosc_compressors = ['blosc-lz4', 'blosc-lz4hc', 'blosc-zlib', 'blosc-zstd']
