@@ -222,12 +222,13 @@ if __name__ == "__main__":
                     factor = int(factor)
                 else:
                     factor = float(factor)
+                print(f"\n\tFactor {factor}\n")
                 # assert factor in all_factors[strategy], f"Factor {factor} is invalid for startegy {strategy}"
                 
                 benchmark_file = results_folder / f"benchmark-lossy-sim-{dset}-{strategy}-{factor}.csv"
                 entry_data = {"probe": probe_name, "strategy": strategy, "factor": factor}
 
-                print("\nCOMPRESSION")
+                print("\n\tCOMPRESSION")
                 # if not is_entry(benchmark_file, entry_data):
                 zarr_path = tmp_folder / "zarr" / f"{zarr_root}_{strategy}_{factor}.zarr"
 
@@ -253,7 +254,7 @@ if __name__ == "__main__":
                 print(f"\tCompression factor {factor}: elapsed time {cspeed}s: "
                         f"CR: {cr} - cspeed xrt - {cspeed_xrt} - rmse: {rmse}")
                 
-                print(f"\nSPIKE SORTING STUDY")
+                print(f"\n\tSPIKE SORTING STUDY")
                 gt_study_dict = {}
                 study_folder = tmp_folder / f"study_{dset}"
                 sort_gt = gt_dict[dset]["sort_gt"]
@@ -280,8 +281,6 @@ if __name__ == "__main__":
                 count_columns = ['num_gt', 'num_sorter', 'num_well_detected', 'num_redundant', 'num_overmerged',
                                  'num_false_positive', 'num_bad']
 
-                df = pd.read_csv(benchmark_file, index_col=False)
-
                 for rec_name in study.rec_names:
                     rec_split = rec_name.split("_")
                     factor = rec_split[-1]
@@ -299,7 +298,7 @@ if __name__ == "__main__":
                         # df.at[index, count_col] = int(cnt[count_col])
                 append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
-                print("\nTEMPLATE METRICS")
+                print("\n\tTEMPLATE METRICS")
                 benchmark_waveforms_file = results_folder / f"benchmark-lossy-sim-waveforms-{dset}-{strategy}-{factor}.csv"
                 rec_name = f"{strategy}_{factor}"
                 rec_zarr = si.read_zarr(zarr_path)
