@@ -197,13 +197,20 @@ if __name__ == "__main__":
             sort_gt = gt_dict[dset]["sort_gt"]
             rec_gt_f = spre.bandpass_filter(rec_gt)
             
-            waveforms_gt_path = results_folder / "gt" / "waveforms"
+            waveforms_gt_path = results_folder / f"gt-{dset}" / "waveforms"
             # cache sorting for disk persistence
-            sorting_gt_path = results_folder / "gt" / "sorting"
-            sort_gt = sort_gt.save(folder=sorting_gt_path)
-            we_gt = si.extract_waveforms(rec_gt_f, sort_gt, folder=waveforms_gt_path,
-                                         ms_after=ms_after, precompute_template=('average', 'std'),
-                                         seed=seed, use_relative_path=True, **job_kwargs)
+            sorting_gt_path = results_folder / f"gt-{dset}" / "sorting"
+            if sorting_gt_path.is_dir():
+                sort_gt = si.load_extractor(sorting_gt_path)
+            else:
+                sort_gt = sort_gt.save(folder=sorting_gt_path)
+
+            if waveforms_gt_path.is_dir():
+                we_gt = si.load_waveforms(waveforms_gt_path)
+            else:
+                we_gt = si.extract_waveforms(rec_gt_f, sort_gt, folder=waveforms_gt_path,
+                                             ms_after=ms_after, precompute_template=('average', 'std'),
+                                             seed=seed, use_relative_path=True, **job_kwargs)
             # find channels for each "GT" unit
             extremum_channels = si.get_template_extremum_channel(we_gt)
             rec_locs = rec_gt.get_channel_locations()
