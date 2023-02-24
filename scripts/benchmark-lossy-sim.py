@@ -23,6 +23,7 @@ import pandas as pd
 import spikeinterface as si
 import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
+import spikeinterface.sorters as ss
 import spikeinterface.postprocessing as spost
 import spikeinterface.comparison as sc
 
@@ -41,7 +42,8 @@ scratch_folder = Path("../scratch")
 n_jobs = None
 job_kwargs = dict(n_jobs=n_jobs if n_jobs is not None else os.cpu_count(),
                   chunk_duration="1s", progress_bar=False, verbose=False)
-ks25_sorter_params = job_kwargs
+sorter_name = "kilosort2_5"
+sorter_params = job_kwargs
 time_range_rmse = [15, 20]
 
 tmp_folder = scratch_folder / "tmp"
@@ -254,49 +256,30 @@ if __name__ == "__main__":
                 print(f"\tCompression factor {factor}: elapsed time {cspeed}s: "
                         f"CR: {cr} - cspeed xrt - {cspeed_xrt} - rmse: {rmse}")
                 
-                print(f"\n\tSPIKE SORTING STUDY")
-                gt_study_dict = {}
-                study_folder = tmp_folder / f"study_{dset}"
-                sort_gt = gt_dict[dset]["sort_gt"]
+                print(f"\n\tSPIKE SORTING")
+                # TODO run one sorter at a time!
+                sorting_output_folder = tmp_folder / f"sorting_{dset}-{strategy}-{factor}"
 
                 rec_zarr = si.read_zarr(zarr_path)
                 rec_zarr_f = spre.bandpass_filter(rec_zarr)
-                gt_study_dict[f"{strategy}_{factor}"] = (rec_zarr_f, sort_gt)
 
-                print(f"\tGT study recordings: {list(gt_study_dict.keys())}")
-                study = sc.GroundTruthStudy.create(study_folder, gt_study_dict, **job_kwargs)
+                sorter = "kilosort2_5"
+                sort_ks = ss.run_sorter(sorter_name,
+                                        recording=rec_zarr_f,
+                                        output_folder=sorting_output_folder,
+                                        delete_output_folder=True,
+                                        **sorter_params)
 
-                print(f"\tRunning spike sorting jobs")
-                sorter_list = ["kilosort2_5"]
-                sorter_params = dict(kilosort_2_5=ks25_sorter_params)
-                study.run_sorters(sorter_list, mode_if_folder_exists="keep", verbose=False,
-                                  sorter_params=sorter_params, remove_sorter_folders=True)
+                print("\tRunning comparison")
+                cmp = sc.compare_sorter_to_ground_truth(sort_gt, sort_ks, exhaustive_gt=True)
 
-                print("\tRunning comparisons")
-                study.run_comparisons(exhaustive_gt=True, verbose=False)
-                dataframes = study.aggregate_dataframes()
-                perf_by_unit = dataframes["perf_by_unit"]
-                perf_columns = ['accuracy', 'recall', 'precision', 'false_discovery_rate', 'miss_rate']
-                counts = dataframes["count_units"]
-                count_columns = ['num_gt', 'num_sorter', 'num_well_detected', 'num_redundant', 'num_overmerged',
-                                 'num_false_positive', 'num_bad']
+                perf_avg = cmp.get_performance(method="pooled_with_average", output="dict")
+                counts = cmp.count_units_categories()
+                new_data.update(perf_avg)
+                new_data.update(counts.to_dict())
 
-                for rec_name in study.rec_names:
-                    rec_split = rec_name.split("_")
-                    factor = rec_split[-1]
-                    strategy = "_".join(rec_split[:-1])
-                    # index = df.query(f"probe == '{probe_name}' and factor == {factor} "
-                    #                  f"and strategy == '{strategy}'").index[0]
-                    perf = perf_by_unit.query(f"rec_name == '{rec_name}'")
-                    for metric in perf_columns:
-                        avg = perf[metric].values.mean()
-                        new_data[f"avg_{metric}"] = avg
-                        # df.at[index, f"avg_{metric}"] = avg
-                    cnt = counts.query(f"rec_name == '{rec_name}'")
-                    for count_col in count_columns:
-                        new_data[count_col] = int(cnt[count_col])
-                        # df.at[index, count_col] = int(cnt[count_col])
                 append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
+                shutil.rmtree(sorting_output_folder)
 
                 print("\n\tTEMPLATE METRICS")
                 benchmark_waveforms_file = results_folder / f"benchmark-lossy-sim-waveforms-{dset}-{strategy}-{factor}.csv"

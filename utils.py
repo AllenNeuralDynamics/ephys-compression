@@ -417,7 +417,7 @@ def cohen_d(x, y):
 
 
 def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
-    """Performs statistical tests and posthoc analysis.
+    """Performs statistical tests and posthoc analysis (in case of multiple groups).
 
     If the distributions are normal with equal variance, it performs the ANOVA test and
     posthoc T-tests (parametric).
@@ -446,7 +446,7 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
         - "cohens": DataFrame with Cohen's d coefficients for significant posthoc results
         - "parametric": True if parametric, False if non-parametric
     """
-    from scipy.stats import kruskal, f_oneway, shapiro, levene
+    from scipy.stats import kruskal, f_oneway, shapiro, levene, ttest_ind, mannwhitneyu
     import scikit_posthocs as sp
 
     df_gb = df.groupby(column_group_by)
@@ -469,48 +469,67 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
                     print("Non normal samples: using non parametric tests")
                 break
         # levene test for equal variances
-        _, pval_var = levene(*samples)
-        if pval_var < sig:
+        if not parametric:
+            _, pval_var = levene(*samples)
+            if pval_var < sig:
+                if verbose:
+                    print("Non equal variances: using non parametric tests")
+                parametric = True
+        if len(samples) > 2:
             if verbose:
-                print("Non equal variances: using non parametric tests")
+                print("Population test")
             parametric = True
-        if parametric:
-            pop_test = kruskal
-            ph_test = sp.posthoc_conover
-        else:
-            pop_test = f_oneway
-            ph_test = sp.posthoc_ttest
-        # run test:
-        _, pval = pop_test(*samples)
-        if pval < sig:
-            # compute posthoc and cohen's d
-            posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust='holm')
-            if verbose and is_notebook():
-                print("Post-hoc")
-                display(posthoc)
+            if parametric:
+                test_fun = kruskal
+                ph_test = sp.posthoc_conover
+            else:
+                test_fun = f_oneway
+                ph_test = sp.posthoc_ttest
+            # run test:
+            _, pval = test_fun(*samples)
+            if pval < sig:
+                # compute posthoc and cohen's d
+                posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust='holm')
+                if verbose and is_notebook():
+                    print("Post-hoc")
+                    display(posthoc)
 
-            # here we just consider the bottom triangular matrix and just keep significant values
-            pvals = np.tril(posthoc.to_numpy(), -1)
-            pvals[pvals == 0] = np.nan
-            pvals[pvals >= sig] = np.nan
-            # cohen's d are computed only on significantly different distributions
-            ph_c = pd.DataFrame(pvals, columns=posthoc.columns, index=posthoc.index)
-            cols = ph_c.columns.values
-            cohens = ph_c.copy()
-            for index, row in ph_c.iterrows():
-                val = row.values
-                ind_non_nan, = np.nonzero(~np.isnan(val))
-                for col_ind in ind_non_nan:
-                    x = df_gb.get_group(index)[metric].values
-                    y = df_gb.get_group(cols[col_ind])[metric].values
-                    cohen = cohen_d(x, y)
-                    cohens.loc[index, cols[col_ind]] = cohen
-            if verbose and is_notebook():
-                print("Cohen's d")
-                display(cohens)
+                # here we just consider the bottom triangular matrix and just keep significant values
+                pvals = np.tril(posthoc.to_numpy(), -1)
+                pvals[pvals == 0] = np.nan
+                pvals[pvals >= sig] = np.nan
+                # cohen's d are computed only on significantly different distributions
+                ph_c = pd.DataFrame(pvals, columns=posthoc.columns, index=posthoc.index)
+                cols = ph_c.columns.values
+                cohens = ph_c.copy()
+                for index, row in ph_c.iterrows():
+                    val = row.values
+                    ind_non_nan, = np.nonzero(~np.isnan(val))
+                    for col_ind in ind_non_nan:
+                        x = df_gb.get_group(index)[metric].values
+                        y = df_gb.get_group(cols[col_ind])[metric].values
+                        cohen = cohen_d(x, y)
+                        cohens.loc[index, cols[col_ind]] = cohen
+                if verbose and is_notebook():
+                    print("Cohen's d")
+                    display(cohens)
+            else:
+                posthoc = None
+                cohens = None
         else:
+            if verbose:
+                print("2-sample test")
             posthoc = None
-            cohens = None 
+            if parametric:
+                test_fun = ttest_ind
+            else:
+                test_fun = mannwhitneyu
+            _, pval = test_fun(*samples)
+            if pval < sig:
+                cohens = cohen_d(*samples)
+                if verbose:
+                    print(f"P-value: {pval} - effect size: {cohens}")
+
         results[metric]["pvalue"] = pval
         results[metric]["posthoc"] = posthoc
         results[metric]["cohens"] = cohens
