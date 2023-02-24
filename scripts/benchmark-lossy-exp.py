@@ -181,7 +181,7 @@ if __name__ == "__main__":
                 else:
                     factor = float(factor)
 
-                benchmark_file = results_folder / f"benchmark-lossy-nogt-{dset}-{strategy}-{factor}.csv"
+                benchmark_file = results_folder / f"benchmark-lossy-exp-{dset}-{strategy}-{factor}.csv"
 
                 if benchmark_file.is_file():
                     df = pd.read_csv(benchmark_file, index_col=False)
