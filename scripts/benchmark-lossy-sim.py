@@ -212,6 +212,8 @@ if __name__ == "__main__":
         for strategy in strategies:
             waveforms_folder = results_folder / f"waveforms-{dset}-{strategy}"
             waveforms_folder.mkdir(exist_ok=True, parents=True)
+            sortings_folder = results_folder / f"sortings-{dset}-{strategy}"
+            sortings_folder.mkdir(exist_ok=True, parents=True)
 
             if factors is None:
                 factors_to_run = all_factors[strategy]
@@ -269,6 +271,7 @@ if __name__ == "__main__":
                                         output_folder=sorting_output_folder,
                                         delete_output_folder=True,
                                         **sorter_params)
+                sort_ks = sort_ks.save(folder=sortings_folder / f"sorting_{strategy}_{factor}")
 
                 print("\tRunning comparison")
                 cmp = sc.compare_sorter_to_ground_truth(sort_gt, sort_ks, exhaustive_gt=True)
@@ -329,8 +332,9 @@ if __name__ == "__main__":
 
 
     # Aggregate results
-    csv_sorting_files = [p for p in data_folder.iterdir() if p.suffix == ".csv" and "waveforms" not in p.name]
-    if len(csv_sorting_files) > 0:
+    csv_sorting_files = [p for p in results_folder.iterdir() if p.suffix == ".csv" and "waveforms" not in p.name]
+    # only aggregate if more than 1
+    if len(csv_sorting_files) > 1:
         benchmark_file = results_folder / f"benchmark-lossy-sim.csv"
         print(f"Found {len(csv_sorting_files)} sorting results CSV files: aggregating results")
         df = None
@@ -342,8 +346,9 @@ if __name__ == "__main__":
         df.to_csv(benchmark_file, index=False)
 
     # aggregate waveform results
-    csv_wfs_files = [p for p in data_folder.iterdir() if p.suffix == ".csv" and "waveforms" in p.name]
-    if len(csv_wfs_files) > 0:
+    csv_wfs_files = [p for p in results_folder.iterdir() if p.suffix == ".csv" and "waveforms" in p.name]
+    # only aggregate if more than 1
+    if len(csv_wfs_files) > 1:
         benchmark_waveforms_file = results_folder / f"benchmark-lossy-sim-waveforms.csv"
         print(f"Found {len(csv_wfs_files)} waveforms results CSV files")
         on = ["probe", "unit_id", "channel_id", "distance"]

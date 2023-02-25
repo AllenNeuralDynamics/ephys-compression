@@ -457,8 +457,10 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
             print(f"\nTesting metric {metric}\n")
         results[metric] = {}
         samples = ()
-        for val in np.unique(df[column_group_by]):
+        for i, val in enumerate(np.unique(df[column_group_by])):
             df_val = df_gb.get_group(val)
+            if verbose:
+                print(f"Sample {i+1}: {val} - n. {len(df_val)}")
             samples += (df_val[metric].values,)
         # shapiro test for normality
         for sample in samples:
@@ -514,6 +516,8 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
                     print("Cohen's d")
                     display(cohens)
             else:
+                if verbose:
+                    print("Non significant")
                 posthoc = None
                 cohens = None
         else:
@@ -529,6 +533,9 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
                 cohens = cohen_d(*samples)
                 if verbose:
                     print(f"P-value: {pval} - effect size: {cohens}")
+            else:
+                if verbose:
+                    print("Non significant")
 
         results[metric]["pvalue"] = pval
         results[metric]["posthoc"] = posthoc
