@@ -139,7 +139,7 @@ if __name__ == "__main__":
         chunk_durations = [config["chunk_duration"]]
         compressors = [config["compressor"]]
         if "session" in config:
-            subsessions = [config["sessions"]]
+            subsessions = [config["session"]]
     else:
         dsets = all_dsets
         chunk_durations = all_chunk_durations
