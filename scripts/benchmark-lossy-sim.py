@@ -330,7 +330,6 @@ if __name__ == "__main__":
 
         print(f"Done with dataset: {dset}")
 
-
     # Aggregate results
     csv_sorting_files = [p for p in results_folder.iterdir() if p.suffix == ".csv" and "waveforms" not in p.name]
     # only aggregate if more than 1
@@ -345,20 +344,27 @@ if __name__ == "__main__":
             sorting_csv_file.unlink()
         df.to_csv(benchmark_file, index=False)
 
-    # aggregate waveform results
-    csv_wfs_files = [p for p in results_folder.iterdir() if p.suffix == ".csv" and "waveforms" in p.name]
-    # only aggregate if more than 1
-    if len(csv_wfs_files) > 1:
-        benchmark_waveforms_file = results_folder / f"benchmark-lossy-sim-waveforms.csv"
-        print(f"Found {len(csv_wfs_files)} waveforms results CSV files")
-        on = ["probe", "unit_id", "channel_id", "distance"]
-        for metric in template_metrics:
-            on += f"{metric}_gt"
-        df_wfs = None
-        for wf_csv_file in csv_wfs_files:
-            print(f"Aggregating {wf_csv_file.name}")
-            df_single = pd.read_csv(wf_csv_file, index_col=False)
-            df_wfs = df_single if df_wfs is None else df_wfs.merge(df_single, on=on)
-            wf_csv_file.unlink()
+    # aggregate waveform results (do by probe then concat)
+    on = ["probe", "unit_id", "channel_id", "distance"]
+    for metric in template_metrics:
+        on += [f"{metric}_gt"]
 
-        df_wfs.to_csv(benchmark_waveforms_file, index=False)
+    df_probes = []
+    for dset in dsets:
+        csv_wfs_probe_files = [p for p in results_folder.iterdir() if p.suffix == ".csv"
+                               and "waveforms" in p.name and dset in p.name]
+        # only aggregate if more than 1
+        if len(csv_wfs_probe_files) > 1:
+            print(f"Found {len(csv_wfs_probe_files)} waveforms results CSV files for dset {dset}")
+            df_wfs = None
+            for i, wf_csv_file in enumerate(csv_wfs_probe_files):
+                print(f"Aggregating {wf_csv_file.name}")
+                df_single = pd.read_csv(wf_csv_file, index_col=False)
+                df_wfs = df_single if df_wfs is None else df_wfs.merge(df_single, on=on)
+                wf_csv_file.unlink()
+            df_probes.append(df_wfs)
+
+    if len(df_probes) > 0:
+        benchmark_waveforms_file = results_folder / f"benchmark-lossy-sim-waveforms.csv"
+        df_wfs_all = pd.concat(df_probes)
+        df_wfs_all.to_csv(benchmark_waveforms_file, index=False)
