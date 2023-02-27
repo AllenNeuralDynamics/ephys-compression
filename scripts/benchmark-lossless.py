@@ -49,7 +49,7 @@ if tmp_folder.is_dir():
 tmp_folder.mkdir(exist_ok=True, parents=True)
 
 # gather data
-sessions = {
+all_sessions = {
     "aind-np2-1": ['595262_2022-02-21_15-18-07_ProbeA',
                    '602454_2022-03-22_16-30-03_ProbeB',
                    '612962_2022-04-13_19-18-04_ProbeB',
@@ -58,10 +58,10 @@ sessions = {
                    '618318_2022-04-13_14-59-07_ProbeB',
                    '618384_2022-04-14_15-11-00_ProbeB',
                    '621362_2022-07-14_11-19-36_ProbeA'],
-    "aind-np1": ['605642_2022-03-11_16-03-34_ProbeA',
-                 '625749_2022-08-03_15-15-06_ProbeA',
+    "aind-np1": ['625749_2022-08-03_15-15-06_ProbeA',
                  '634568_2022-08-05_15-59-46_ProbeA',
-                 '634569_2022-08-09_16-14-38_ProbeA'],
+                 '634569_2022-08-09_16-14-38_ProbeA',
+                 '634571_2022-08-04_14-27-05_ProbeA'],
     "ibl-np1": ['CSHZAD026_2020-09-04_probe00',
                 'CSHZAD029_2020-09-09_probe00',
                 'SWC054_2020-10-05_probe00',
@@ -117,6 +117,7 @@ subset_columns = ["session", "dataset", "compressor", "compressor_type", "chunk_
 if __name__ == "__main__":
     # check if json files in data
     json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
+    subsessions = None
 
     if len(sys.argv) == 4:
         if sys.argv[1] == "all":
@@ -137,6 +138,8 @@ if __name__ == "__main__":
         dsets = [config["dset"]]
         chunk_durations = [config["chunk_duration"]]
         compressors = [config["compressor"]]
+        if "session" in config:
+            subsessions = [config["sessions"]]
     else:
         dsets = all_dsets
         chunk_durations = all_chunk_durations
@@ -184,7 +187,12 @@ if __name__ == "__main__":
                         print(f"Number of existing entries: {len(df)}")
 
                 # loop over sessions in dataset
-                for session in sessions[dset]:
+                if subsessions is not None:
+                    assert all(session in all_sessions[dset] for session in subsessions)
+                    sessions = subsessions
+                else:
+                    sessions = all_sessions[dset]
+                for session in sessions:
                     print(f"\nBenchmarking session: {session}\n")
                     t_start_session = time.perf_counter()
 

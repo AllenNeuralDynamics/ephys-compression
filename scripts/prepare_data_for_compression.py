@@ -155,11 +155,10 @@ aind_ephys_bucket = f"s3://aind-ephys-data/"
 dataset = "aind-np1"
 
 aind_np1_sessions = {
-    "605642_2022-03-11_16-03-34": {"probe": "ProbeA"},
     "625749_2022-08-03_15-15-06": {"probe": "ProbeA"},
     "634568_2022-08-05_15-59-46": {"probe": "ProbeA"},
-    "634569_2022-08-09_16-14-38": {"probe": "ProbeA"}
-    # "613482_2022-06-16_17-49-19": {"probe": "ProbeA-AP"},
+    "634569_2022-08-09_16-14-38": {"probe": "ProbeA"},
+    "634571_2022-08-04_14-27-05": {"probe": "ProbeA"},
 }
 
 
