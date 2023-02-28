@@ -190,9 +190,10 @@ if __name__ == "__main__":
 
                 for session in sessions[dset]:
                     t_start_session = time.perf_counter()
+                    print(f"\tBenchmarking {session}")
                     rec = si.load_extractor(ephys_benchmark_folder / dset_name / session)
                     dur = rec.get_total_duration()
-                    print(f"\tBenchmarking {session} - duration {dur}s\n")
+                    print(f"\tDuration {dur}s\n")
                     dtype = rec.get_dtype()
                     gain = rec.get_channel_gains()[0]
 
@@ -308,6 +309,20 @@ if __name__ == "__main__":
         t_stop_dset = time.perf_counter()
         elapsed_dset = np.round(t_stop_dset - t_start_dset)
         print(f"\nElapsed time dataset: {elapsed_dset}s")
+
+    # aggregate pandas dataframes into one
+    csv_files = [p for p in results_folder.iterdir() if p.suffix == ".csv"]
+    print(f"Found {len(csv_files)} CSV files")
+    df = None
+
+    if len(csv_files) > 1:
+        for csv_file in csv_files:
+            print(f"Aggregating {csv_file.name}")
+            df_single = pd.read_csv(csv_file, index_col=False)
+            df = df_single if df is None else pd.concat((df, df_single))
+
+        if df is not None:
+            df.to_csv(benchmark_file, index=False)
 
     # final cleanup
     shutil.rmtree(tmp_folder)
