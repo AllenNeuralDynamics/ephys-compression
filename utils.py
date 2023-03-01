@@ -543,12 +543,11 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
                 cohens = cohen_d(*samples)
                 if verbose:
                     if pval < 1e-10:
-                        pval_round = 1e-10
-                        exp = f"<1e-10"
+                        pval_round = "<1e-10"
                     else:
                         exp = int(np.ceil(np.log10(pval)))
                         pval_round = f"<1e{exp}"
-                    print(f"P-value < {pval_round} ({pval}) - effect size: {np.round(cohens, 3)}")
+                    print(f"P-value {pval_round} ({pval}) - effect size: {np.round(cohens, 3)}")
             else:
                 if verbose:
                     print("Non significant")

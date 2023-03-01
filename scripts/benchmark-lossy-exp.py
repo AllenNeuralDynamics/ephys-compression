@@ -251,6 +251,7 @@ if __name__ == "__main__":
                         # remove duplicated spikes
                         sorting = scur.remove_redundant_units(sorting, duplicate_threshold=0.9, align=False,
                                                               remove_strategy="max_spikes")
+                        sorting = scur.remove_excess_spikes(sorting, recording=rec_zarr_cmr)
                         ks_good_unit_ids = sorting.unit_ids[sorting.get_property('KSLabel')=="good"]
                         sorting_good = sorting.select_units(unit_ids=ks_good_unit_ids)
                         sorting_saved = sorting.save(folder=sorting_path)
