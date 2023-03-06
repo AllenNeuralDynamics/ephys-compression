@@ -268,8 +268,8 @@ if __name__ == "__main__":
                                     rec_to_compress = rec_to_compress
                                 else:
                                     rec_to_compress = \
-                                        preprocessing_option["preprocessing_fun"] \
-                                            (rec_to_compress, **preprocessing_option["preprocessing_params"])
+                                        preprocessing_option["preprocess_fun"] \
+                                            (rec_to_compress, **preprocessing_option["preprocess_params"])
 
                                 zarr_path = tmp_folder / f'{dset_name}_{session}.zarr'
                                 if zarr_path.is_dir():
