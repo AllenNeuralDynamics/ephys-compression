@@ -312,6 +312,7 @@ if __name__ == "__main__":
         print(f"\nElapsed time dataset: {elapsed_dset}s")
 
     # aggregate pandas dataframes into one
+    benchmark_file = results_folder / f"benchmark-lossy-exp.csv"
     csv_files = [p for p in results_folder.iterdir() if p.suffix == ".csv"]
     print(f"Found {len(csv_files)} CSV files")
     df = None

@@ -492,7 +492,8 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
             pval_round = pval
             if pval < sig:
                 # compute posthoc and cohen's d
-                posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust='holm')
+                posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust='holm',
+                                  sort=False)
 
                 # here we just consider the bottom triangular matrix and just keep significant values
                 pvals = np.tril(posthoc.to_numpy(), -1)
@@ -530,6 +531,7 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
                     print("Non significant")
                 posthoc = None
                 cohens = None
+                pval_round = None
         else:
             if verbose:
                 print("2-sample test")
@@ -551,6 +553,9 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
             else:
                 if verbose:
                     print("Non significant")
+                posthoc = None
+                pval_round = None
+                cohens = None
 
         results[metric]["pvalue"] = pval
         results[metric]["pvalue-round"] = pval_round
