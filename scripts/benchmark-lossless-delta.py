@@ -36,6 +36,7 @@ from utils import append_to_csv, is_entry, gs_download_folder
 
 from flac_numcodecs import Flac
 from wavpack_numcodecs import WavPack
+from delta2d_numcodecs import Delta2D
 
 overwrite = False
 
@@ -104,8 +105,7 @@ job_kwargs = {'n_jobs': n_jobs if n_jobs is not None else os.cpu_count(), "verbo
 lsb_corrections = {"ibl-np1": False,  # spikeGLX is already "LSB-corrected"
                    "aind-np2": True,
                    "aind-np1": True}
-delta_filters = {'false' : [], 
-                 'true': [numcodecs.Delta(dtype="int16")]}
+delta_filters = ['no', '1d', '2d-time', '2d-space', '2d-time-space', '2d-space-time']
 
 subset_columns = ["session", "dataset", "compressor", "compressor_type",
                   "level", "shuffle", "probe", "channel_chunk_size", "delta"]
@@ -196,19 +196,21 @@ if __name__ == "__main__":
                     level_compressor = levels[cname]
                     channel_chunk_size = channel_chunk_sizes[cname]
 
+
+
                 for level_name, level in level_compressor.items():
                     for shuffle_name, shuffle in shuffles[compressor_type].items():
-                        for delta_str, delta_filter in delta_filters.items():
+                        for delta_option in delta_filters:
                             entry_data = {"session": session, "dataset": dset_name,
                                           "compressor": cname, "compressor_type": compressor_type,
                                           "level": level_name, "chunk_duration": chunk_dur,
                                           "shuffle": shuffle_name, "probe": probe_name,
-                                          "channel_chunk_size": channel_chunk_size, "delta": delta_str}
+                                          "channel_chunk_size": channel_chunk_size, "delta": delta_option}
 
                             if not is_entry(benchmark_file, entry_data):
                                 print(f"\n\tCompressor {cname}: level {level_name} "
                                       f"chunk duration - {chunk_dur} shuffle {shuffle_name} - "
-                                      f"channel_chunk_size {channel_chunk_size} - delta {delta_str}")
+                                      f"channel_chunk_size {channel_chunk_size} - delta {delta_option}")
                                 # download only if needed
                                 if rec is None:
                                     rec_folder = ephys_benchmark_folder / dset_name / session
@@ -244,8 +246,6 @@ if __name__ == "__main__":
                                     filters = shuffle
                                     compressor = numcodecs.registry.codec_registry[cname](level)
 
-                                filters = delta_filter + filters
-
                                 if lsb:
                                     if rec_lsb is None:
                                         rec_lsb = spre.correct_lsb(rec, verbose=True)
@@ -259,8 +259,33 @@ if __name__ == "__main__":
 
                                 if channel_chunk_size == -1:
                                     chan_size = None
+                                    num_channels_2d = rec_to_compress.get_num_channels()
                                 else:
                                     chan_size = channel_chunk_size
+                                    num_channels_2d = channel_chunk_size
+
+                                if delta_option == "no":
+                                    delta_filter = []
+                                elif delta_option == "1d":
+                                    delta_filter = [numcodecs.Delta(dtype=dtype)]
+                                elif delta_option == "2d-time":
+                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
+                                                                      axis=0)]
+                                elif delta_option == "2d-time":
+                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
+                                                                      axis=1)]
+                                elif delta_option == "2d-time-space":
+                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
+                                                                      axis=0),
+                                                    numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
+                                                                      axis=1)]
+                                elif delta_option == "2d-space-time":
+                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
+                                                                      axis=1),
+                                                    numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
+                                                                      axis=0)]
+
+                                filters = delta_filter + filters
 
                                 t_start = time.perf_counter()
                                 rec_compressed = rec_to_compress.save(folder=zarr_path, format="zarr",
@@ -297,7 +322,7 @@ if __name__ == "__main__":
                                 data = {"session": session, "dataset": dset_name,
                                         "probe": probe_name, "num_channels": num_channels,
                                         "duration": dur, "dtype": dtype, "compressor": cname,
-                                        "level": level_name, "shuffle": shuffle_name, "delta": delta_str,
+                                        "level": level_name, "shuffle": shuffle_name, "delta": delta_option,
                                         "chunk_duration": chunk_dur, "CR": cr,
                                         "C-speed": compression_elapsed_time,
                                         "compressor_type": compressor_type,
