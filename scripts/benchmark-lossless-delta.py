@@ -269,21 +269,15 @@ if __name__ == "__main__":
                                 elif delta_option == "1d":
                                     delta_filter = [numcodecs.Delta(dtype=dtype)]
                                 elif delta_option == "2d-time":
-                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
-                                                                      axis=0)]
+                                    delta_filter = [Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=0)]
                                 elif delta_option == "2d-time":
-                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
-                                                                      axis=1)]
+                                    delta_filter = [Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=1)]
                                 elif delta_option == "2d-time-space":
-                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
-                                                                      axis=0),
-                                                    numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
-                                                                      axis=1)]
+                                    delta_filter = [Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=0),
+                                                    Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=1)]
                                 elif delta_option == "2d-space-time":
-                                    delta_filter = [numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
-                                                                      axis=1),
-                                                    numcodecs.Delta2D(dtype=dtype, num_channels=num_channels_2d,
-                                                                      axis=0)]
+                                    delta_filter = [Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=1),
+                                                    Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=0)]
 
                                 filters = delta_filter + filters
 
