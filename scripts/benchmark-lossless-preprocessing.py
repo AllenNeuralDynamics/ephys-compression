@@ -43,7 +43,7 @@ data_folder = Path("../data")
 results_folder = Path("../results")
 scratch_folder = Path("../scratch")
 
-tmp_folder = scratch_folder / "tmp_compression" / "lossless-delta"
+tmp_folder = scratch_folder / "tmp_compression" / "lossless-preprocessing"
 if tmp_folder.is_dir():
     shutil.rmtree(tmp_folder)
 tmp_folder.mkdir(exist_ok=True, parents=True)
@@ -120,7 +120,7 @@ preprocessing_options = {
 }
 
 subset_columns = ["session", "dataset", "compressor", "compressor_type",
-                  "level", "shuffle", "probe", "channel_chunk_size", "delta"]
+                  "level", "shuffle", "probe", "channel_chunk_size", "preprocessing"]
 
 if __name__ == "__main__":
     # check if json files in data
