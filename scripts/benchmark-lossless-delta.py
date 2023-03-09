@@ -36,7 +36,7 @@ from utils import append_to_csv, is_entry, gs_download_folder
 
 from flac_numcodecs import Flac
 from wavpack_numcodecs import WavPack
-from delta2d_numcodecs import Delta2D
+from delta2D_numcodecs import Delta2D
 
 overwrite = False
 
