@@ -84,7 +84,7 @@ levels = {
     "gzip": {"low": 1, "medium": 5, "high": 9},
     "lzma": {"low": 1, "medium": 5, "high": 9},
     "flac": {"low": 1, "medium": 5, "high": 8},
-    "wavpack": {"low": 1, "medium": 2, "high": 3}
+    "wavpack": {"high": 3, "medium": 2, "low": 1 }
 }
 
 # define filters and shuffles
@@ -285,10 +285,10 @@ if __name__ == "__main__":
 
                                         t_start = time.perf_counter()
                                         rec_compressed = rec_to_compress.save(folder=zarr_path, format="zarr",
-                                                                                compressor=compressor,
-                                                                                filters=filters,
-                                                                                channel_chunk_size=chan_size,
-                                                                                **job_kwargs)
+                                                                              compressor=compressor,
+                                                                              filters=filters,
+                                                                              channel_chunk_size=chan_size,
+                                                                              **job_kwargs)
                                         t_stop = time.perf_counter()
                                         compression_elapsed_time = np.round(t_stop - t_start, 2)
 

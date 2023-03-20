@@ -105,7 +105,7 @@ job_kwargs = {'n_jobs': n_jobs if n_jobs is not None else os.cpu_count(), "verbo
 lsb_corrections = {"ibl-np1": False,  # spikeGLX is already "LSB-corrected"
                    "aind-np2": True,
                    "aind-np1": True}
-delta_filters = ['no', '1d', '2d-time', '2d-space', '2d-time-space', '2d-space-time']
+delta_filters = ['no', '1d', '2d-time', '2d-space', '2d-time-space']
 
 subset_columns = ["session", "dataset", "compressor", "compressor_type",
                   "level", "shuffle", "probe", "channel_chunk_size", "delta"]
@@ -115,17 +115,23 @@ if __name__ == "__main__":
     json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
     subsessions = None
 
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 3:
         if sys.argv[1] == "all":
             dsets = all_dsets
         else:
             dsets = [sys.argv[1]]
+        if sys.argv[2] == "all":
+            compressors = all_compressors
+        else:
+            compressors = [sys.argv[2]]
     elif len(json_files) == 1:
         config_file = json_files[0]
         config = json.load(open(config_file, 'r'))
         dsets = [config["dset"]]
+        compressors = [config["compressor"]]
     else:
         dsets = all_dsets
+        compressors = all_compressors
 
     print(f"Benchmarking:\n\tDatasets: {dsets}\n\Delta filters: {delta_filters}\n\tCompressors: {compressors}")
 
@@ -275,9 +281,6 @@ if __name__ == "__main__":
                                 elif delta_option == "2d-time-space":
                                     delta_filter = [Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=0),
                                                     Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=1)]
-                                elif delta_option == "2d-space-time":
-                                    delta_filter = [Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=1),
-                                                    Delta2D(dtype=dtype, num_channels=num_channels_2d, axis=0)]
 
                                 filters = delta_filter + filters
 
