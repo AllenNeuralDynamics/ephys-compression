@@ -84,7 +84,7 @@ levels = {
     "gzip": {"low": 1, "medium": 5, "high": 9},
     "lzma": {"low": 1, "medium": 5, "high": 9},
     "flac": {"low": 1, "medium": 5, "high": 8},
-    "wavpack": {"high": 3, "medium": 2, "low": 1 }
+    "wavpack": {"low": 1, "medium": 2, "high": 3}
 }
 
 # define filters and shuffles
