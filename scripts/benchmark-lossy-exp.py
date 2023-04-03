@@ -170,7 +170,7 @@ if __name__ == "__main__":
     print(f"Running lossy benchmarks on:")
     print(f"\tDatasets: {dsets}")
     print(f"\tStrategies: {strategies}")
-    print(f"\fFactors: {factors if factors is not None else 'all'}")
+    print(f"\tFactors: {factors if factors is not None else 'all'}")
     print(f"\tNum runs: {num_runs}")
     print(f"\tSave recordings: {save_recordings}")
 
@@ -312,7 +312,7 @@ if __name__ == "__main__":
                         sortings_raw = []
                         sortings_curated = []
                         for i in range(num_runs):
-                            print(f"Running spike sorting run {i + 1} / {num_runs}")
+                            print(f"\t\tRunning spike sorting run {i + 1} / {num_runs}")
                             # run spike sorting
                             tmp_sorting_output_folder = (
                                 tmp_folder / f"sorting_{rec_name}_{i}"
