@@ -14,8 +14,9 @@ In particular, the simulated data mimic the experimental data in terms of:
 **Note** that the LSB > 1 is only for Open Ephys data and not for SpikeGLX.
 """
 
-import MEArec as mr
 from pathlib import Path
+
+import MEArec as mr
 
 NP_VERSION = 2
 
@@ -51,8 +52,12 @@ if NP_VERSION == 1:
 else:
     recordings_params["recordings"]["lsb"] = 3
 recordings_params["recordings"]["lsb"]
-recgen = mr.gen_recordings(params=recordings_params, tempgen=tempgen, 
-                           n_jobs=10, verbose=True,)
+recgen = mr.gen_recordings(
+    params=recordings_params,
+    tempgen=tempgen,
+    n_jobs=10,
+    verbose=True,
+)
 
 
 rec_name = f"mearec_NP{NP_VERSION}.h5"
