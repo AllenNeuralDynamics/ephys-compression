@@ -31,8 +31,7 @@ from wavpack_numcodecs import WavPack
 # add utils to path
 this_folder = Path(__file__).parent
 sys.path.append(str(this_folder.parent))
-from utils import (append_to_csv, benchmark_lossy_compression, is_entry,
-                   trunc_filter)
+from utils import append_to_csv, benchmark_lossy_compression, is_entry, trunc_filter
 
 data_folder = Path("../data")
 results_folder = Path("../results")

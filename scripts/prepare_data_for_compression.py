@@ -33,8 +33,7 @@ import spikeinterface.extractors as se
 
 sys.path.append("..")
 
-from utils import (s3_download_folder, s3_download_public_folder,
-                   s3_upload_folder)
+from utils import s3_download_folder, s3_download_public_folder, s3_upload_folder
 
 ephys_compression_folder_path = Path(__file__).parent.parent
 
