@@ -132,7 +132,7 @@ if __name__ == "__main__":
             factors = None
         else:
             factors = [float(sys.argv[3])]
-        if sys.argv[4] < 0:
+        if int(sys.argv[4]) < 0:
             num_runs = 1
         else:
             num_runs = int(sys.argv[4])
@@ -166,6 +166,13 @@ if __name__ == "__main__":
     print(f"Benchmark data folder: {ephys_benchmark_folder}")
 
     print(f"spikeinterface version: {si.__version__}")
+
+    print(f"Running lossy benchmarks on:")
+    print(f"\tDatasets: {dsets}")
+    print(f"\tStrategies: {strategies}")
+    print(f"\fFactors: {factors if factors is not None else 'all'}")
+    print(f"\tNum runs: {num_runs}")
+    print(f"\tSave recordings: {save_recordings}")
 
     tmp_folder = scratch_folder / "tmp"
     if tmp_folder.is_dir():
