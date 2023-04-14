@@ -20,9 +20,9 @@ def is_notebook() -> bool:
     """
     try:
         shell = get_ipython().__class__.__name__
-        if shell == 'ZMQInteractiveShell':
-            return True   # Jupyter notebook or qtconsole
-        elif shell == 'TerminalInteractiveShell':
+        if shell == "ZMQInteractiveShell":
+            return True  # Jupyter notebook or qtconsole
+        elif shell == "TerminalInteractiveShell":
             return False  # Terminal running IPython
         else:
             return False  # Other type (?)
@@ -52,7 +52,7 @@ def is_entry(csv_file, entry, subset_columns=None):
         df = pd.read_csv(csv_file)
         if subset_columns is None:
             subset_columns = list(entry.keys())
-            
+
         if np.any([k not in df.columns for k in list(entry.keys())]):
             return False
 
@@ -123,15 +123,16 @@ def trunc_filter(bits, dtype):
     list
         List of numcodecs filters
     """
-    scale = 1.0 / (2 ** bits)
+    scale = 1.0 / (2**bits)
     if bits == 0:
         return []
     else:
         return [numcodecs.FixedScaleOffset(offset=0, scale=scale, dtype=dtype)]
 
 
-def benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, filters=None,
-                                time_range_rmse=[10, 20], channel_chunk_size=-1, **job_kwargs):
+def benchmark_lossy_compression(
+    rec_to_compress, compressor, zarr_path, filters=None, time_range_rmse=[10, 20], channel_chunk_size=-1, **job_kwargs
+):
     """Benchmarks lossy compression for one recording, including:
 
     - compression ratio (CR)
@@ -168,10 +169,14 @@ def benchmark_lossy_compression(rec_to_compress, compressor, zarr_path, filters=
     """
     fs = rec_to_compress.get_sampling_frequency()
     t_start = time.perf_counter()
-    rec_compressed = rec_to_compress.save(format="zarr", folder=zarr_path,
-                                          compressor=compressor, filters=filters, 
-                                          channel_chunk_size=channel_chunk_size,
-                                          **job_kwargs)
+    rec_compressed = rec_to_compress.save(
+        format="zarr",
+        folder=zarr_path,
+        compressor=compressor,
+        filters=filters,
+        channel_chunk_size=channel_chunk_size,
+        **job_kwargs,
+    )
     t_stop = time.perf_counter()
     cspeed = np.round(t_stop - t_start, 2)
     dur = rec_to_compress.get_num_samples() / fs
@@ -233,7 +238,8 @@ def get_s3_client(region_name):
     import boto3
     from botocore.config import Config
     from botocore import UNSIGNED
-    bc = boto3.client('s3', config=Config(signature_version=UNSIGNED), region_name=region_name)
+
+    bc = boto3.client("s3", config=Config(signature_version=UNSIGNED), region_name=region_name)
     return bc
 
 
@@ -258,8 +264,9 @@ def s3_download_public_file(object, destination, bucket, region_name):
     boto_client.download_file(bucket, object, str(destination / object_name))
 
 
-def s3_download_public_folder(remote_folder, destination, bucket, region_name, skip_patterns=None,
-                              overwrite=False, verbose=True):
+def s3_download_public_folder(
+    remote_folder, destination, bucket, region_name, skip_patterns=None, overwrite=False, verbose=True
+):
     """Downloads a folder from a S3 public bucket.
 
     Parameters
@@ -286,9 +293,9 @@ def s3_download_public_folder(remote_folder, destination, bucket, region_name, s
         if isinstance(skip_patterns, str):
             skip_patterns = [skip_patterns]
 
-    for item in response.get('Contents', []):
-        object = item['Key']
-        if object.endswith('/') and item['Size'] == 0:  # skips  folder
+    for item in response.get("Contents", []):
+        object = item["Key"]
+        if object.endswith("/") and item["Size"] == 0:  # skips  folder
             continue
         local_file_path = Path(destination).joinpath(Path(object).relative_to(remote_folder))
         local_file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,7 +304,7 @@ def s3_download_public_folder(remote_folder, destination, bucket, region_name, s
         if any(sp in object for sp in skip_patterns):
             skip = True
 
-        if not overwrite and local_file_path.exists() and local_file_path.stat().st_size == item['Size'] or skip:
+        if not overwrite and local_file_path.exists() and local_file_path.stat().st_size == item["Size"] or skip:
             if verbose:
                 print(f"skipping {local_file_path}")
         else:
@@ -413,7 +420,9 @@ def cohen_d(x, y):
     nx = len(x)
     ny = len(y)
     dof = nx + ny - 2
-    return (np.mean(x) - np.mean(y)) / np.sqrt(((nx-1)*np.std(x, ddof=1) ** 2 + (ny-1)*np.std(y, ddof=1) ** 2) / dof)
+    return (np.mean(x) - np.mean(y)) / np.sqrt(
+        ((nx - 1) * np.std(x, ddof=1) ** 2 + (ny - 1) * np.std(y, ddof=1) ** 2) / dof
+    )
 
 
 def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
@@ -492,8 +501,7 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
             pval_round = pval
             if pval < sig:
                 # compute posthoc and cohen's d
-                posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust='holm',
-                                  sort=False)
+                posthoc = ph_test(df, val_col=metric, group_col=column_group_by, p_adjust="holm", sort=False)
 
                 # here we just consider the bottom triangular matrix and just keep significant values
                 pvals = np.tril(posthoc.to_numpy(), -1)
@@ -507,7 +515,7 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
                 cohens = ph_c.copy()
                 for index, row in ph_c.iterrows():
                     val = row.values
-                    ind_non_nan, = np.nonzero(~np.isnan(val))
+                    (ind_non_nan,) = np.nonzero(~np.isnan(val))
                     for col_ind in ind_non_nan:
                         x = df_gb.get_group(index)[metric].values
                         y = df_gb.get_group(cols[col_ind])[metric].values
@@ -562,5 +570,5 @@ def stat_test(df, column_group_by, test_columns, sig=0.01, verbose=False):
         results[metric]["posthoc"] = posthoc
         results[metric]["cohens"] = cohens
         results[metric]["parametric"] = parametric
-        
+
     return results

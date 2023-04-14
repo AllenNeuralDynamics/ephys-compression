@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import spikeinterface as si
 import spikeinterface.curation as scur
+import spikeinterface.comparison as sc
 import spikeinterface.postprocessing as spost
 import spikeinterface.preprocessing as spre
 import spikeinterface.qualitymetrics as sqm
@@ -108,6 +109,17 @@ zarr_compressor = Blosc(cname="zstd", clevel=zarr_clevel, shuffle=Blosc.BITSHUFF
 # define wavpack options
 level = 3
 
+# define compress time range for short snippet saved in the "compressed_recordings" folder
+compressed_recordings_folder = results_folder / "compressed_recordings"
+compress_range = [28, 33]
+
+# define match_score and comparison folder
+match_score = 0.9
+comparisons_folder = results_folder / "comparisons"
+accuracies_folder = results_folder / "accuracies"
+comparisons_folder.mkdir()
+accuracies_folder.mkdir()
+
 
 subset_columns = ["dset", "session", "strategy", "factor", "probe"]
 
@@ -131,7 +143,7 @@ if __name__ == "__main__":
         if float(sys.argv[3]) < 0:
             factors = None
         else:
-            factors = [float(sys.argv[3])]
+            factors = [0, float(sys.argv[3])]
         if int(sys.argv[4]) < 0:
             num_runs = 1
         else:
@@ -145,7 +157,7 @@ if __name__ == "__main__":
         config = json.load(open(config_file, "r"))
         dsets = [config["dset"]]
         strategies = [config["strategy"]]
-        factors = [config["factor"]]
+        factors = [0, config["factor"]]
         num_runs = config.get("num_runs", 1)
         save_recordings = config.get("save_recordings", False)
     else:
@@ -155,11 +167,7 @@ if __name__ == "__main__":
         num_runs = 2
         save_recordings = False
 
-    ephys_benchmark_folders = [
-        p
-        for p in data_folder.iterdir()
-        if p.is_dir() and "compression-benchmark" in p.name
-    ]
+    ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
         raise Exception("Can't find attached compression benchamrk data bucket")
     ephys_benchmark_folder = ephys_benchmark_folders[0]
@@ -220,10 +228,7 @@ if __name__ == "__main__":
                 else:
                     factor = float(factor)
 
-                benchmark_file = (
-                    results_folder
-                    / f"benchmark-lossy-exp-{dset}-{strategy}-{factor}.csv"
-                )
+                benchmark_file = results_folder / f"benchmark-lossy-exp-{dset}-{strategy}-{factor}.csv"
 
                 if benchmark_file.is_file():
                     df = pd.read_csv(benchmark_file, index_col=False)
@@ -233,9 +238,7 @@ if __name__ == "__main__":
                 for session in sessions[dset]:
                     t_start_session = time.perf_counter()
                     print(f"\tBenchmarking {session}")
-                    rec = si.load_extractor(
-                        ephys_benchmark_folder / dset_name / session
-                    )
+                    rec = si.load_extractor(ephys_benchmark_folder / dset_name / session)
                     dur = rec.get_total_duration()
                     print(f"\tDuration {dur}s\n")
                     dtype = rec.get_dtype()
@@ -274,13 +277,7 @@ if __name__ == "__main__":
                             filters = None
                             compressor = WavPack(level=3, bps=factor)
 
-                        (
-                            rec_compressed,
-                            cr,
-                            cspeed_xrt,
-                            elapsed_time,
-                            rmse,
-                        ) = benchmark_lossy_compression(
+                        (rec_compressed, cr, cspeed_xrt, elapsed_time, rmse,) = benchmark_lossy_compression(
                             rec_to_compress,
                             compressor,
                             zarr_path,
@@ -288,14 +285,30 @@ if __name__ == "__main__":
                             time_range_rmse=time_range_rmse,
                             **job_kwargs,
                         )
-                        print(
-                            f"\t\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n"
-                        )
+                        print(f"\t\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
 
                         if save_recordings:
                             zarr_path_save = str(zarr_path.relative_to(results_folder))
                         else:
                             zarr_path_save = "none"
+
+                        # save snippet for visualization
+                        rec_slice = rec.frame_slice(
+                            start_frame=int(compress_range[0] * fs), end_frame=int(compress_range[1] * fs)
+                        )
+                        zarr_path_slice = compressed_recordings_folder / f"{session}_{strategy}-{factor}.zarr"
+                        if zarr_path_slice.is_dir():
+                            shutil.rmtree(zarr_path_slice)
+                        rec_compressed = rec_slice.save(
+                            folder=zarr_path_slice,
+                            format="zarr",
+                            n_jobs=n_jobs,
+                            chunk_duration="1s",
+                            progress_bar=False,
+                            compressor=compressor,
+                            filters=filters,
+                            verbose=False,
+                        )
 
                         new_data = {
                             "dataset": dset_name,
@@ -307,6 +320,7 @@ if __name__ == "__main__":
                             "cspeed_xrt": cspeed_xrt,
                             "rmse": rmse,
                             "rec_zarr_path": str(zarr_path_save),
+                            "rec_zarr_path_slice": str(zarr_path_slice.relative_to(results_folder)),
                         }
 
                         sortings_raw = []
@@ -314,12 +328,14 @@ if __name__ == "__main__":
                         for i in range(num_runs):
                             print(f"\t\tRunning spike sorting run {i + 1} / {num_runs}")
                             # run spike sorting
-                            tmp_sorting_output_folder = (
-                                tmp_folder / f"sorting_{rec_name}_{i}"
-                            )
-                            raw_sorting_path = (
-                                raw_sorting_outputs_folder / f"{rec_name}_{i}"
-                            )
+                            sorting_name = f"sorting_{rec_name}"
+                            curated_sorting_name = f"{sorting_name}_curated"
+                            if i > 0:
+                                sorting_name += f"_{i}"
+                                curated_sorting_name += f"_{i}"
+                            tmp_sorting_output_folder = tmp_folder / sorting_name
+                            raw_sorting_path = raw_sorting_outputs_folder / sorting_name
+                            curated_sorting_path = curated_sorting_outputs_folder / curated_sorting_name
 
                             # basic pre-processing
                             rec_zarr = si.read_zarr(zarr_path)
@@ -341,22 +357,14 @@ if __name__ == "__main__":
                                 align=False,
                                 remove_strategy="max_spikes",
                             )
-                            sorting = scur.remove_excess_spikes(
-                                sorting, recording=rec_zarr_cmr
-                            )
-                            ks_good_unit_ids = sorting.unit_ids[
-                                sorting.get_property("KSLabel") == "good"
-                            ]
-                            sorting_good = sorting.select_units(
-                                unit_ids=ks_good_unit_ids
-                            )
+                            sorting = scur.remove_excess_spikes(sorting, recording=rec_zarr_cmr)
+                            ks_good_unit_ids = sorting.unit_ids[sorting.get_property("KSLabel") == "good"]
+                            sorting_good = sorting.select_units(unit_ids=ks_good_unit_ids)
                             sorting_saved = sorting.save(folder=raw_sorting_path)
                             # cleanup
                             sorting = sorting_saved
 
-                            new_data["sorting_path"] = str(
-                                raw_sorting_path.relative_to(results_folder)
-                            )
+                            new_data["sorting_path"] = str(raw_sorting_path.relative_to(results_folder))
                             new_data["n_raw_units"] = len(sorting_saved.unit_ids)
                             new_data["n_ks_good_units"] = len(sorting_good.unit_ids)
 
@@ -366,56 +374,33 @@ if __name__ == "__main__":
                             )
 
                             # run auto-curation
-                            wf_path = (
-                                tmp_folder / f"waveforms_raw_{dset_name}_{session}_{i}"
-                            )
-                            we = si.extract_waveforms(
-                                rec_zarr_cmr, sorting, folder=wf_path, **job_kwargs
-                            )
+                            wf_path = tmp_folder / f"waveforms_raw_{dset_name}_{session}_{i}"
+                            we = si.extract_waveforms(rec_zarr_cmr, sorting, folder=wf_path, **job_kwargs)
                             _ = spost.compute_spike_amplitudes(we, **job_kwargs)
-                            qm = sqm.compute_quality_metrics(
-                                we, metric_names=metric_names
-                            )
+                            qm = sqm.compute_quality_metrics(we, metric_names=metric_names)
                             units_to_keeps = qm.query(auto_curation_query).index.values
 
-                            curated_sorting_path = (
-                                curated_sorting_outputs_folder / f"{rec_name}_{i}"
-                            )
                             sorting_curated = sorting.select_units(units_to_keeps)
-                            sorting_curated_saved = sorting_curated.save(
-                                folder=curated_sorting_path
-                            )
+                            sorting_curated_saved = sorting_curated.save(folder=curated_sorting_path)
 
-                            new_data["sorting_curated_path"] = str(
-                                curated_sorting_path.relative_to(results_folder)
-                            )
-                            new_data["n_curated_good_units"] = len(
-                                sorting_curated.unit_ids
-                            )
-                            new_data["n_curated_bad_units"] = len(
-                                sorting.unit_ids
-                            ) - len(sorting_curated.unit_ids)
+                            new_data["sorting_curated_path"] = str(curated_sorting_path.relative_to(results_folder))
+                            new_data["n_curated_good_units"] = len(sorting_curated.unit_ids)
+                            new_data["n_curated_bad_units"] = len(sorting.unit_ids) - len(sorting_curated.unit_ids)
 
                             print(
                                 f"\t\t\tCuration: num units - {len(sorting.unit_ids)} num auto-curated units "
                                 f"{len(sorting_curated.unit_ids)}\n"
                             )
 
-                            append_to_csv(
-                                benchmark_file, new_data, subset_columns=subset_columns
-                            )
+                            append_to_csv(benchmark_file, new_data, subset_columns=subset_columns)
 
                             print(f"\n\t\tSummary {rec_name}:\n")
-                            print(
-                                f"\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n"
-                            )
+                            print(f"\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
                             print(
                                 f"\t\tSpike sorting: num units - {len(sorting.unit_ids)} num KS good units - "
                                 f"{len(sorting_good.unit_ids)}\n"
                             )
-                            print(
-                                f"\t\tCuration: num auto-curated units {len(sorting_curated.unit_ids)}\n"
-                            )
+                            print(f"\t\tCuration: num auto-curated units {len(sorting_curated.unit_ids)}\n")
                             # clean up
                             shutil.rmtree(wf_path)
                             del we
@@ -455,6 +440,79 @@ if __name__ == "__main__":
         # remove single CSV files
         for csv_file in csv_files:
             csv_file.unlink()
+
+    # compute spike sorting comparisons against lossless
+    res_lossy = pd.read_csv(results_folder / "benchmark-lossy-exp.csv", index_col=False)
+    sessions = np.unique(res_lossy.session)
+    sortings_folder = raw_sorting_outputs_folder
+
+    print("\n\nComputing and saving pairwise comparisons\n\n")
+    for session in sessions:
+        t_start_session = time.perf_counter()
+        probe = np.unique(res_lossy.query(f"session == '{session}'").probe)[0]
+        print(f"{session} - {probe}\n")
+
+        # Load lossless sortings
+        lossless_sorting_folders_wv = [
+            p for p in sortings_folder.iterdir() if f"wavpack-0" in p.name and session in p.name
+        ]
+        if len(lossless_sorting_folders_wv) == 1:
+            lossless_sorting_wv = si.load_extractor(lossless_sorting_folders_wv[0])
+            print(f"Lossless WavPack: {lossless_sorting_wv}")
+        else:
+            lossless_sorting_wv = None
+        lossless_sorting_folders_bt = [
+            p for p in sortings_folder.iterdir() if f"bit_truncation-0" in p.name and session in p.name
+        ]
+        if len(lossless_sorting_folders_bt) == 1:
+            lossless_sorting_bt = si.load_extractor(lossless_sorting_folders_bt[0])
+            print(f"Lossless Bit Truncation: {lossless_sorting_wv}")
+        else:
+            lossless_sorting_bt = None
+
+        for strategy in strategies:
+            if factors is None:
+                factors_to_run = all_factors[strategy]
+            else:
+                factors_to_run = factors
+            if strategy == "wavpack":
+                lossless_sorting = lossless_sorting_wv
+                lossless_other = lossless_sorting_bt
+            else:
+                lossless_sorting = lossless_sorting_bt
+                lossless_other = lossless_sorting_wv
+
+            print(f"Strategy {strategy}\n")
+            tested_sortings = []
+            for test_factor in factors:
+                print(f"\tComparing factor {test_factor}")
+                if test_factor == 0:
+                    if lossless_other is not None:
+                        tested_sorting = lossless_other
+                    else:
+                        print(f"Cannot compute comparison for factor 0: other strategy is not available.")
+                else:
+                    tested_sorting_folder = [
+                        p
+                        for p in sortings_folder.iterdir()
+                        if f"{strategy}-{test_factor}" in p.name and session in p.name
+                    ][0]
+                    tested_sorting = si.load_extractor(tested_sorting_folder)
+                print(f"\tTested: {tested_sorting}")
+                tested_sortings.append(tested_sorting)
+                mcmp = sc.compare_multiple_sorters(
+                    [lossless_sorting, tested_sorting],
+                    name_list=["original", f"{strategy}-{test_factor}"],
+                    match_score=match_score,
+                )
+                mcmp.save_to_folder(comparisons_folder / f"{session}-{strategy}-{str(test_factor)}")
+                sorting_agr = mcmp.get_agreement_sorting(minimum_agreement_count=2)
+                cmp_single = mcmp.comparisons[list(mcmp.comparisons.keys())[0]]
+                acc = np.diag(cmp_single.get_ordered_agreement_scores())
+                np.save(accuracies_folder / f"{session}-{strategy}-{str(test_factor)}.npy", acc)
+                print(f"\tUnits in agreement: {len(sorting_agr.unit_ids)}")
+        t_stop_session = time.perf_counter()
+        print(f"Elapsed time {session}: {np.round(t_stop_session - t_start_session, 2)} s")
 
     # final
     shutil.rmtree(tmp_folder)

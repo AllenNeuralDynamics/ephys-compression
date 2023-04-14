@@ -109,11 +109,7 @@ if __name__ == "__main__":
         strategies = all_strategies
         factors = None
 
-    ephys_benchmark_folders = [
-        p
-        for p in data_folder.iterdir()
-        if p.is_dir() and "compression-benchmark" in p.name
-    ]
+    ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
         raise Exception("Can't find attached compression benchamrk data bucket")
     ephys_benchmark_folder = ephys_benchmark_folders[0]
@@ -126,11 +122,7 @@ if __name__ == "__main__":
 
     gt_dict = {}
     for dset in dsets:
-        rec_file = [
-            p
-            for p in (ephys_benchmark_folder / "mearec").iterdir()
-            if p.suffix == ".h5" and dset in p.name
-        ][0]
+        rec_file = [p for p in (ephys_benchmark_folder / "mearec").iterdir() if p.suffix == ".h5" and dset in p.name][0]
 
         print(f"\n\nBenchmarking {rec_file.name}\n")
         t_start_all = time.perf_counter()
@@ -207,9 +199,7 @@ if __name__ == "__main__":
 
         print(f"\tComputing GT template metrics")
         template_metrics = spost.get_template_metric_names()
-        df_tm = spost.compute_template_metrics(
-            we_gt, upsampling_factor=10, sparsity=sparsity
-        )
+        df_tm = spost.compute_template_metrics(we_gt, upsampling_factor=10, sparsity=sparsity)
         df_tm["probe"] = [probe_name] * len(df_tm)
         df_tm["unit_id"] = df_tm.index.to_frame()["unit_id"].values
         df_tm["channel_id"] = df_tm.index.to_frame()["channel_id"].values
@@ -221,16 +211,12 @@ if __name__ == "__main__":
             else:
                 tm_unit = df_tm.query(f"unit_id == {unit_id}")
 
-            loc_main = rec_gt.get_channel_locations(
-                channel_ids=[extremum_channels[unit_id]]
-            )[0]
+            loc_main = rec_gt.get_channel_locations(channel_ids=[extremum_channels[unit_id]])[0]
             for index, row in tm_unit.iterrows():
                 loc = rec_gt.get_channel_locations(channel_ids=[row["channel_id"]])[0]
                 distance = np.linalg.norm(loc - loc_main)
                 # round distance to dist interval
-                df_tm.at[index, "distance"] = int(
-                    dist_interval * np.round(distance / dist_interval)
-                )
+                df_tm.at[index, "distance"] = int(dist_interval * np.round(distance / dist_interval))
 
         for metric in template_metrics:
             df_tm[f"{metric}_gt"] = df_tm[metric]
@@ -257,10 +243,7 @@ if __name__ == "__main__":
                 print(f"\n\tFactor {factor}\n")
                 # assert factor in all_factors[strategy], f"Factor {factor} is invalid for startegy {strategy}"
 
-                benchmark_file = (
-                    results_folder
-                    / f"benchmark-lossy-sim-{dset}-{strategy}-{factor}.csv"
-                )
+                benchmark_file = results_folder / f"benchmark-lossy-sim-{dset}-{strategy}-{factor}.csv"
                 entry_data = {
                     "probe": probe_name,
                     "strategy": strategy,
@@ -269,9 +252,7 @@ if __name__ == "__main__":
 
                 print("\n\tCOMPRESSION")
                 # if not is_entry(benchmark_file, entry_data):
-                zarr_path = (
-                    tmp_folder / "zarr" / f"{zarr_root}_{strategy}_{factor}.zarr"
-                )
+                zarr_path = tmp_folder / "zarr" / f"{zarr_root}_{strategy}_{factor}.zarr"
 
                 if zarr_path.is_dir():
                     shutil.rmtree(zarr_path)
@@ -283,13 +264,7 @@ if __name__ == "__main__":
                     filters = None
                     compressor = WavPack(level=wv_level, bps=factor)
 
-                (
-                    rec_compressed,
-                    cr,
-                    cspeed_xrt,
-                    cspeed,
-                    rmse,
-                ) = benchmark_lossy_compression(
+                (rec_compressed, cr, cspeed_xrt, cspeed, rmse,) = benchmark_lossy_compression(
                     rec_to_compress,
                     compressor,
                     zarr_path,
@@ -317,9 +292,7 @@ if __name__ == "__main__":
 
                 print(f"\n\tSPIKE SORTING")
                 # TODO run one sorter at a time!
-                sorting_output_folder = (
-                    tmp_folder / f"sorting_{dset}-{strategy}-{factor}"
-                )
+                sorting_output_folder = tmp_folder / f"sorting_{dset}-{strategy}-{factor}"
 
                 rec_zarr = si.read_zarr(zarr_path)
                 rec_zarr_f = spre.bandpass_filter(rec_zarr)
@@ -332,18 +305,12 @@ if __name__ == "__main__":
                     delete_output_folder=True,
                     **sorter_params,
                 )
-                sort_ks = sort_ks.save(
-                    folder=sortings_folder / f"sorting_{strategy}_{factor}"
-                )
+                sort_ks = sort_ks.save(folder=sortings_folder / f"sorting_{strategy}_{factor}")
 
                 print("\tRunning comparison")
-                cmp = sc.compare_sorter_to_ground_truth(
-                    sort_gt, sort_ks, exhaustive_gt=True
-                )
+                cmp = sc.compare_sorter_to_ground_truth(sort_gt, sort_ks, exhaustive_gt=True)
 
-                perf_avg = cmp.get_performance(
-                    method="pooled_with_average", output="dict"
-                )
+                perf_avg = cmp.get_performance(method="pooled_with_average", output="dict")
                 counts = cmp.count_units_categories()
                 new_data.update(perf_avg)
                 new_data.update(counts.to_dict())
@@ -353,8 +320,7 @@ if __name__ == "__main__":
 
                 print("\n\tTEMPLATE METRICS")
                 benchmark_waveforms_file = (
-                    results_folder
-                    / f"benchmark-lossy-sim-waveforms-{dset}-{strategy}-{factor}.csv"
+                    results_folder / f"benchmark-lossy-sim-waveforms-{dset}-{strategy}-{factor}.csv"
                 )
                 rec_name = f"{strategy}_{factor}"
                 rec_zarr = si.read_zarr(zarr_path)
@@ -375,14 +341,10 @@ if __name__ == "__main__":
                 )
                 # compute features
                 print(f"\tComputing lossy template metrics")
-                df_tm_lossy = spost.compute_template_metrics(
-                    we_lossy, upsampling_factor=10, sparsity=sparsity
-                )
+                df_tm_lossy = spost.compute_template_metrics(we_lossy, upsampling_factor=10, sparsity=sparsity)
                 df_tm_lossy["probe"] = [probe_name] * len(df_tm_lossy)
                 df_tm_lossy["unit_id"] = df_tm_lossy.index.to_frame()["unit_id"].values
-                df_tm_lossy["channel_id"] = df_tm_lossy.index.to_frame()[
-                    "channel_id"
-                ].values
+                df_tm_lossy["channel_id"] = df_tm_lossy.index.to_frame()["channel_id"].values
 
                 # add channel distance
                 for unit_id in np.unique(df_tm_lossy.unit_id):
@@ -391,17 +353,11 @@ if __name__ == "__main__":
                     else:
                         tm_unit = df_tm_lossy.query(f"unit_id == {unit_id}")
 
-                    loc_main = rec_gt.get_channel_locations(
-                        channel_ids=[extremum_channels[unit_id]]
-                    )[0]
+                    loc_main = rec_gt.get_channel_locations(channel_ids=[extremum_channels[unit_id]])[0]
                     for index, row in tm_unit.iterrows():
-                        loc = rec_gt.get_channel_locations(
-                            channel_ids=[row["channel_id"]]
-                        )[0]
+                        loc = rec_gt.get_channel_locations(channel_ids=[row["channel_id"]])[0]
                         distance = np.linalg.norm(loc - loc_main)
-                        df_tm_lossy.at[index, "distance"] = int(
-                            dist_interval * np.round(distance / dist_interval)
-                        )
+                        df_tm_lossy.at[index, "distance"] = int(dist_interval * np.round(distance / dist_interval))
 
                 df_tm_local = df_tm.copy()
                 for metric in template_metrics:
@@ -417,17 +373,11 @@ if __name__ == "__main__":
         print(f"Done with dataset: {dset}")
 
     # Aggregate results
-    csv_sorting_files = [
-        p
-        for p in results_folder.iterdir()
-        if p.suffix == ".csv" and "waveforms" not in p.name
-    ]
+    csv_sorting_files = [p for p in results_folder.iterdir() if p.suffix == ".csv" and "waveforms" not in p.name]
     # only aggregate if more than 1
     if len(csv_sorting_files) > 1:
         benchmark_file = results_folder / f"benchmark-lossy-sim.csv"
-        print(
-            f"Found {len(csv_sorting_files)} sorting results CSV files: aggregating results"
-        )
+        print(f"Found {len(csv_sorting_files)} sorting results CSV files: aggregating results")
         df = None
         for sorting_csv_file in csv_sorting_files:
             print(f"Aggregating {sorting_csv_file.name}")
@@ -444,15 +394,11 @@ if __name__ == "__main__":
     df_probes = []
     for dset in dsets:
         csv_wfs_probe_files = [
-            p
-            for p in results_folder.iterdir()
-            if p.suffix == ".csv" and "waveforms" in p.name and dset in p.name
+            p for p in results_folder.iterdir() if p.suffix == ".csv" and "waveforms" in p.name and dset in p.name
         ]
         # only aggregate if more than 1
         if len(csv_wfs_probe_files) > 1:
-            print(
-                f"Found {len(csv_wfs_probe_files)} waveforms results CSV files for dset {dset}"
-            )
+            print(f"Found {len(csv_wfs_probe_files)} waveforms results CSV files for dset {dset}")
             df_wfs = None
             for i, wf_csv_file in enumerate(csv_wfs_probe_files):
                 print(f"Aggregating {wf_csv_file.name}")

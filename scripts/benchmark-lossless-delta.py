@@ -154,15 +154,9 @@ if __name__ == "__main__":
         dsets = all_dsets
         compressors = all_compressors
 
-    print(
-        f"Benchmarking:\n\tDatasets: {dsets}\n\Delta filters: {delta_filters}\n\tCompressors: {compressors}"
-    )
+    print(f"Benchmarking:\n\tDatasets: {dsets}\n\Delta filters: {delta_filters}\n\tCompressors: {compressors}")
 
-    ephys_benchmark_folders = [
-        p
-        for p in data_folder.iterdir()
-        if p.is_dir() and "compression-benchmark" in p.name
-    ]
+    ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
         raise Exception("Couldn't find attached benchmark data")
     ephys_benchmark_folder = ephys_benchmark_folders[0]
@@ -188,14 +182,10 @@ if __name__ == "__main__":
         job_kwargs["chunk_duration"] = chunk_dur
 
         for cname in compressors:
-            print(
-                f"\n\n\nBenchmarking dset {dset} - duration: {chunk_dur} - compressor {cname}\n\n"
-            )
+            print(f"\n\n\nBenchmarking dset {dset} - duration: {chunk_dur} - compressor {cname}\n\n")
 
             # create results file
-            benchmark_file = (
-                results_folder / f"benchmark-lossless-{dset}-{chunk_dur}-{cname}.csv"
-            )
+            benchmark_file = results_folder / f"benchmark-lossless-{dset}-{chunk_dur}-{cname}.csv"
             benchmark_file.parent.mkdir(exist_ok=True, parents=True)
             if overwrite:
                 if benchmark_file.is_file():
@@ -257,9 +247,7 @@ if __name__ == "__main__":
                                 )
                                 # download only if needed
                                 if rec is None:
-                                    rec_folder = (
-                                        ephys_benchmark_folder / dset_name / session
-                                    )
+                                    rec_folder = ephys_benchmark_folder / dset_name / session
                                     rec = si.load_extractor(rec_folder)
 
                                     # rec_info
@@ -280,24 +268,16 @@ if __name__ == "__main__":
                                 if compressor_type == "blosc":
                                     filters = []
                                     blosc_cname = cname.split("-")[1]
-                                    compressor = Blosc(
-                                        cname=blosc_cname, clevel=level, shuffle=shuffle
-                                    )
+                                    compressor = Blosc(cname=blosc_cname, clevel=level, shuffle=shuffle)
                                 elif compressor_type == "numcodecs":
                                     if cname != "lzma":
-                                        compressor = numcodecs.registry.codec_registry[
-                                            cname
-                                        ](level)
+                                        compressor = numcodecs.registry.codec_registry[cname](level)
                                     else:
-                                        compressor = numcodecs.registry.codec_registry[
-                                            cname
-                                        ](preset=level)
+                                        compressor = numcodecs.registry.codec_registry[cname](preset=level)
                                     filters = shuffle
                                 elif compressor_type == "audio":
                                     filters = shuffle
-                                    compressor = numcodecs.registry.codec_registry[
-                                        cname
-                                    ](level)
+                                    compressor = numcodecs.registry.codec_registry[cname](level)
 
                                 if lsb:
                                     if rec_lsb is None:
@@ -375,30 +355,18 @@ if __name__ == "__main__":
 
                                 # get traces 1s
                                 t_start = time.perf_counter()
-                                traces = rec_compressed.get_traces(
-                                    start_frame=start_frame_1s, end_frame=end_frame_1s
-                                )
+                                traces = rec_compressed.get_traces(start_frame=start_frame_1s, end_frame=end_frame_1s)
                                 t_stop = time.perf_counter()
-                                decompression_1s_elapsed_time = np.round(
-                                    t_stop - t_start, 2
-                                )
+                                decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
 
                                 # get traces 10s
                                 t_start = time.perf_counter()
-                                traces = rec_compressed.get_traces(
-                                    start_frame=start_frame_10s, end_frame=end_frame_10s
-                                )
+                                traces = rec_compressed.get_traces(start_frame=start_frame_10s, end_frame=end_frame_10s)
                                 t_stop = time.perf_counter()
-                                decompression_10s_elapsed_time = np.round(
-                                    t_stop - t_start, 2
-                                )
+                                decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
 
-                                decompression_10s_rt = (
-                                    10.0 / decompression_10s_elapsed_time
-                                )
-                                decompression_1s_rt = (
-                                    1.0 / decompression_1s_elapsed_time
-                                )
+                                decompression_10s_rt = 10.0 / decompression_10s_elapsed_time
+                                decompression_1s_rt = 1.0 / decompression_1s_elapsed_time
 
                                 # record entry
                                 data = {
@@ -423,9 +391,7 @@ if __name__ == "__main__":
                                     "dspeed1s_xrt": decompression_1s_rt,
                                     "channel_chunk_size": channel_chunk_size,
                                 }
-                                append_to_csv(
-                                    benchmark_file, data, subset_columns=subset_columns
-                                )
+                                append_to_csv(benchmark_file, data, subset_columns=subset_columns)
                                 print(
                                     f"\t--> elapsed time {compression_elapsed_time}s - CR={cr} - "
                                     f"cspeed_xrt={cspeed_xrt} - dspeed10s_xrt={decompression_10s_rt}"

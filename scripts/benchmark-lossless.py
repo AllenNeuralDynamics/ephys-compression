@@ -169,15 +169,9 @@ if __name__ == "__main__":
         chunk_durations = all_chunk_durations
         compressors = all_compressors
 
-    print(
-        f"Benchmarking:\n\tDatasets: {dsets}\n\tChunk durations: {chunk_durations}\n\tCompressors: {compressors}"
-    )
+    print(f"Benchmarking:\n\tDatasets: {dsets}\n\tChunk durations: {chunk_durations}\n\tCompressors: {compressors}")
 
-    ephys_benchmark_folders = [
-        p
-        for p in data_folder.iterdir()
-        if p.is_dir() and "compression-benchmark" in p.name
-    ]
+    ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
         raise Exception("Couldn't find attached benchmark data")
     ephys_benchmark_folder = ephys_benchmark_folders[0]
@@ -203,15 +197,10 @@ if __name__ == "__main__":
             job_kwargs["chunk_duration"] = chunk_dur
 
             for cname in compressors:
-                print(
-                    f"\n\n\nBenchmarking dset {dset} - duration: {chunk_dur} - compressor {cname}\n\n"
-                )
+                print(f"\n\n\nBenchmarking dset {dset} - duration: {chunk_dur} - compressor {cname}\n\n")
 
                 # create results file
-                benchmark_file = (
-                    results_folder
-                    / f"benchmark-lossless-{dset}-{chunk_dur}-{cname}.csv"
-                )
+                benchmark_file = results_folder / f"benchmark-lossless-{dset}-{chunk_dur}-{cname}.csv"
                 benchmark_file.parent.mkdir(exist_ok=True, parents=True)
                 if overwrite:
                     if benchmark_file.is_file():
@@ -255,9 +244,7 @@ if __name__ == "__main__":
 
                     for channel_chunk_size in channel_chunk_size_comp:
                         for level_name, level in levels_compressor.items():
-                            for shuffle_name, shuffle in shuffles[
-                                compressor_type
-                            ].items():
+                            for shuffle_name, shuffle in shuffles[compressor_type].items():
                                 for lsb_str, lsb in lsb_correction.items():
                                     entry_data = {
                                         "session": session,
@@ -280,11 +267,7 @@ if __name__ == "__main__":
                                         )
                                         # download only if needed
                                         if rec is None:
-                                            rec_folder = (
-                                                ephys_benchmark_folder
-                                                / dset_name
-                                                / session
-                                            )
+                                            rec_folder = ephys_benchmark_folder / dset_name / session
                                             rec = si.load_extractor(rec_folder)
 
                                             # rec_info
@@ -312,38 +295,22 @@ if __name__ == "__main__":
                                             )
                                         elif compressor_type == "numcodecs":
                                             if cname != "lzma":
-                                                compressor = (
-                                                    numcodecs.registry.codec_registry[
-                                                        cname
-                                                    ](level)
-                                                )
+                                                compressor = numcodecs.registry.codec_registry[cname](level)
                                             else:
-                                                compressor = (
-                                                    numcodecs.registry.codec_registry[
-                                                        cname
-                                                    ](preset=level)
-                                                )
+                                                compressor = numcodecs.registry.codec_registry[cname](preset=level)
                                             filters = shuffle
                                         elif compressor_type == "audio":
                                             filters = shuffle
-                                            compressor = (
-                                                numcodecs.registry.codec_registry[
-                                                    cname
-                                                ](level)
-                                            )
+                                            compressor = numcodecs.registry.codec_registry[cname](level)
 
                                         if lsb:
                                             if rec_lsb is None:
-                                                rec_lsb = spre.correct_lsb(
-                                                    rec, verbose=True
-                                                )
+                                                rec_lsb = spre.correct_lsb(rec, verbose=True)
                                             rec_to_compress = rec_lsb
                                         else:
                                             rec_to_compress = rec
 
-                                        zarr_path = (
-                                            tmp_folder / f"{dset_name}_{session}.zarr"
-                                        )
+                                        zarr_path = tmp_folder / f"{dset_name}_{session}.zarr"
                                         if zarr_path.is_dir():
                                             shutil.rmtree(zarr_path)
 
@@ -362,17 +329,13 @@ if __name__ == "__main__":
                                             **job_kwargs,
                                         )
                                         t_stop = time.perf_counter()
-                                        compression_elapsed_time = np.round(
-                                            t_stop - t_start, 2
-                                        )
+                                        compression_elapsed_time = np.round(t_stop - t_start, 2)
 
                                         cspeed_xrt = dur / compression_elapsed_time
 
                                         # cr
                                         cr = np.round(
-                                            rec_compressed.get_annotation(
-                                                "compression_ratio"
-                                            ),
+                                            rec_compressed.get_annotation("compression_ratio"),
                                             3,
                                         )
 
@@ -383,9 +346,7 @@ if __name__ == "__main__":
                                             end_frame=end_frame_1s,
                                         )
                                         t_stop = time.perf_counter()
-                                        decompression_1s_elapsed_time = np.round(
-                                            t_stop - t_start, 2
-                                        )
+                                        decompression_1s_elapsed_time = np.round(t_stop - t_start, 2)
 
                                         # get traces 10s
                                         t_start = time.perf_counter()
@@ -394,16 +355,10 @@ if __name__ == "__main__":
                                             end_frame=end_frame_10s,
                                         )
                                         t_stop = time.perf_counter()
-                                        decompression_10s_elapsed_time = np.round(
-                                            t_stop - t_start, 2
-                                        )
+                                        decompression_10s_elapsed_time = np.round(t_stop - t_start, 2)
 
-                                        decompression_10s_rt = (
-                                            10.0 / decompression_10s_elapsed_time
-                                        )
-                                        decompression_1s_rt = (
-                                            1.0 / decompression_1s_elapsed_time
-                                        )
+                                        decompression_10s_rt = 10.0 / decompression_10s_elapsed_time
+                                        decompression_1s_rt = 1.0 / decompression_1s_elapsed_time
 
                                         # record entry
                                         data = {
@@ -445,3 +400,25 @@ if __name__ == "__main__":
         t_stop_dset = time.perf_counter()
         elapsed_time_dset = np.round(t_stop_dset - t_start_dset, 3)
         print(f"Elapsed time dset {dset}: {elapsed_time_dset}s")
+
+    # aggregate pandas dataframes into one
+    benchmark_file = results_folder / f"benchmark-lossy.csv"
+    csv_files = [p for p in results_folder.iterdir() if p.suffix == ".csv"]
+    print(f"Found {len(csv_files)} CSV files")
+    df = None
+
+    if len(csv_files) > 1:
+        for csv_file in csv_files:
+            print(f"Aggregating {csv_file.name}")
+            df_single = pd.read_csv(csv_file, index_col=False)
+            df = df_single if df is None else pd.concat((df, df_single))
+
+        if df is not None:
+            df.to_csv(benchmark_file, index=False)
+
+        # remove single CSV files
+        for csv_file in csv_files:
+            csv_file.unlink()
+
+    # final
+    shutil.rmtree(tmp_folder)

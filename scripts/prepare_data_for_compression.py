@@ -81,14 +81,10 @@ aind_np2_sessions = {
 for session, session_data in aind_np2_sessions.items():
     print(session)
     session_folder = output_folder / dataset / f"{session}_{session_data['probe']}"
-    remote_location = (
-        f"{compression_bucket_path}/{dataset}/{session}_{session_data['probe']}"
-    )
+    remote_location = f"{compression_bucket_path}/{dataset}/{session}_{session_data['probe']}"
 
     process_and_upload_session = False
-    if f"{compression_bucket_path}/{dataset}" not in fs.ls(
-        f"{compression_bucket_path}"
-    ):
+    if f"{compression_bucket_path}/{dataset}" not in fs.ls(f"{compression_bucket_path}"):
         process_and_upload_session = True
     elif remote_location not in fs.ls(f"{compression_bucket_path}/{dataset}"):
         process_and_upload_session = True
@@ -99,18 +95,12 @@ for session, session_data in aind_np2_sessions.items():
             dest = tmp_folder / dataset
             oe_folder = dest / session
             print(f"Syncing {session}")
-            s3_download_folder(
-                aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder
-            )
+            s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
 
             # clean (keep experiment1 only)
-            record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][
-                0
-            ]
+            record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][0]
             # check if multiple experiments
-            experiments = [
-                p for p in record_node_folder.iterdir() if "experiment" in p.name
-            ]
+            experiments = [p for p in record_node_folder.iterdir() if "experiment" in p.name]
             settings = [p for p in record_node_folder.iterdir() if "settings" in p.name]
             if len(experiments) > 1:
                 for exp in experiments:
@@ -124,11 +114,7 @@ for session, session_data in aind_np2_sessions.items():
 
             # streams
             stream_names, stream_ids = se.get_neo_streams("openephys", oe_folder)
-            stream_name = [
-                stream_name
-                for stream_name in stream_names
-                if session_data["probe"] in stream_name
-            ][0]
+            stream_name = [stream_name for stream_name in stream_names if session_data["probe"] in stream_name][0]
             stream_id = stream_ids[stream_names.index(stream_name)]
 
             # load recording
@@ -138,18 +124,14 @@ for session, session_data in aind_np2_sessions.items():
             if recording.get_num_segments() > 1:
                 segment_lengths = []
                 for segment_index in range(recording.get_num_segments()):
-                    segment_lengths.append(
-                        recording.get_num_samples(segment_index=segment_index)
-                    )
+                    segment_lengths.append(recording.get_num_samples(segment_index=segment_index))
                 longest_segment = np.argmax(segment_lengths)
                 recording = recording.select_segments([longest_segment])
             print(recording)
             print(recording.get_channel_locations()[:4])
             recording.save(folder=session_folder, **job_kwargs)
 
-            s3_upload_folder(
-                compression_bucket, f"{dataset}/{session_folder.name}", session_folder
-            )
+            s3_upload_folder(compression_bucket, f"{dataset}/{session_folder.name}", session_folder)
 
             if delete_tmp_files_as_created:
                 print(f"Deleting tmp folder {oe_folder}")
@@ -181,14 +163,10 @@ aind_np1_sessions = {
 for session, session_data in aind_np1_sessions.items():
     print(session)
     session_folder = output_folder / dataset / f"{session}_{session_data['probe']}"
-    remote_location = (
-        f"{compression_bucket_path}/{dataset}/{session}_{session_data['probe']}"
-    )
+    remote_location = f"{compression_bucket_path}/{dataset}/{session}_{session_data['probe']}"
 
     process_and_upload_session = False
-    if f"{compression_bucket_path}/{dataset}" not in fs.ls(
-        f"{compression_bucket_path}"
-    ):
+    if f"{compression_bucket_path}/{dataset}" not in fs.ls(f"{compression_bucket_path}"):
         process_and_upload_session = True
     elif remote_location not in fs.ls(f"{compression_bucket_path}/{dataset}"):
         process_and_upload_session = True
@@ -199,18 +177,12 @@ for session, session_data in aind_np1_sessions.items():
             dest = tmp_folder / dataset
             oe_folder = dest / session
             print(f"Syncing {session}")
-            s3_download_folder(
-                aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder
-            )
+            s3_download_folder(aind_ephys_bucket, f"ecephys_{session}/ecephys", oe_folder)
 
             # clean (keep experiment1 only)
-            record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][
-                0
-            ]
+            record_node_folder = [p for p in oe_folder.iterdir() if "Record" in p.name][0]
             # check if multiple experiments
-            experiments = [
-                p for p in record_node_folder.iterdir() if "experiment" in p.name
-            ]
+            experiments = [p for p in record_node_folder.iterdir() if "experiment" in p.name]
             settings = [p for p in record_node_folder.iterdir() if "settings" in p.name]
             if len(experiments) > 1:
                 for exp in experiments:
@@ -238,18 +210,14 @@ for session, session_data in aind_np1_sessions.items():
             if recording.get_num_segments() > 1:
                 segment_lengths = []
                 for segment_index in range(recording.get_num_segments()):
-                    segment_lengths.append(
-                        recording.get_num_samples(segment_index=segment_index)
-                    )
+                    segment_lengths.append(recording.get_num_samples(segment_index=segment_index))
                 longest_segment = np.argmax(segment_lengths)
                 recording = recording.select_segments([longest_segment])
             print(recording)
             print(recording.get_channel_locations()[:4])
             recording.save(folder=session_folder, **job_kwargs)
 
-            s3_upload_folder(
-                compression_bucket, f"{dataset}/{session_folder.name}", session_folder
-            )
+            s3_upload_folder(compression_bucket, f"{dataset}/{session_folder.name}", session_folder)
 
             if delete_tmp_files_as_created:
                 print(f"Deleting tmp folder {oe_folder}")
@@ -288,9 +256,7 @@ for session, session_path in ibl_sessions.items():
 
     process_and_upload_session = False
 
-    if f"{compression_bucket_path}/{dataset}" not in fs.ls(
-        f"{compression_bucket_path}"
-    ):
+    if f"{compression_bucket_path}/{dataset}" not in fs.ls(f"{compression_bucket_path}"):
         process_and_upload_session = True
     elif remote_location not in fs.ls(f"{compression_bucket_path}/{dataset}"):
         process_and_upload_session = True
@@ -315,9 +281,7 @@ for session, session_path in ibl_sessions.items():
             # save output to binary
             recording.save(folder=session_folder, **job_kwargs)
 
-            s3_upload_folder(
-                compression_bucket, f"{dataset}/{session_folder.name}", session_folder
-            )
+            s3_upload_folder(compression_bucket, f"{dataset}/{session_folder.name}", session_folder)
 
             if delete_tmp_files_as_created:
                 print(f"Deleting tmp folder {cbin_folder}")

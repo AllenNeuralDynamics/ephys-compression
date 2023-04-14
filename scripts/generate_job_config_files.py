@@ -58,9 +58,7 @@ i = 1
 for dset in exp_datasets:
     for chunk_duration in chunk_durations:
         for compressor in compressors:
-            config_dict = dict(
-                dset=dset, chunk_duration=chunk_duration, compressor=compressor
-            )
+            config_dict = dict(dset=dset, chunk_duration=chunk_duration, compressor=compressor)
             with (lossless_folder / f"job_config_{i}.json").open("w") as f:
                 json.dump(config_dict, f)
             i += 1
