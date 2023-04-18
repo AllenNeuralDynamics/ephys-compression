@@ -120,22 +120,13 @@ lsb_corrections = {
 preprocessing_options = {
     "none": dict(preprocess_fun=None, preprocess_params=None),
     "highpass_300": dict(preprocess_fun=spre.highpass_filter, preprocess_params={"freq_min": 300}),
-    "highpass_500": dict(preprocess_fun=spre.highpass_filter, preprocess_params={"freq_min": 500}),
-    "bandpass_300-3000": dict(
-        preprocess_fun=spre.bandpass_filter,
-        preprocess_params={"freq_min": 300, "freq_max": 3000},
-    ),
-    "bandpass_500-3000": dict(
-        preprocess_fun=spre.bandpass_filter,
-        preprocess_params={"freq_min": 500, "freq_max": 3000},
-    ),
     "bandpass_300-6000": dict(
         preprocess_fun=spre.bandpass_filter,
         preprocess_params={"freq_min": 300, "freq_max": 6000},
     ),
-    "bandpass_500-6000": dict(
+    "bandpass_300-15000": dict(
         preprocess_fun=spre.bandpass_filter,
-        preprocess_params={"freq_min": 500, "freq_max": 6000},
+        preprocess_params={"freq_min": 500, "freq_max": 14999},
     ),
 }
 

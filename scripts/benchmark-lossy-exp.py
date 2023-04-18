@@ -491,6 +491,7 @@ if __name__ == "__main__":
                         tested_sorting = lossless_other
                     else:
                         print(f"Cannot compute comparison for factor 0: other strategy is not available.")
+                        continue
                 else:
                     tested_sorting_folder = [
                         p
