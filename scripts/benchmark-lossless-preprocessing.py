@@ -160,7 +160,7 @@ if __name__ == "__main__":
         dsets = all_dsets
 
     print(
-        f"Benchmarking:\n\tDatasets: {dsets}\n\Preprocessing options: {list(preprocessing_options.keys())}"
+        f"Benchmarking:\n\tDatasets: {dsets}\n\tPreprocessing options: {list(preprocessing_options.keys())}"
         f"\n\tCompressors: {compressors}"
     )
 
