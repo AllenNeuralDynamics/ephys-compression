@@ -80,14 +80,13 @@ blosc_compressors = ["blosc-zstd"]
 numcodecs_compressors = ["lzma"]
 audio_compressors = ["flac", "wavpack"]
 all_compressors = blosc_compressors + numcodecs_compressors + audio_compressors
-compressors = all_compressors
 
 # define levels
 levels = {
     "blosc": {"high": 9},
     "lzma": {"high": 9},
-    "flac": {"high": 8},
-    "wavpack": {"high": 3},
+    "flac": {"medium": 5},
+    "wavpack": {"medium": 2},
 }
 
 # define filters and shuffles
@@ -152,12 +151,20 @@ if __name__ == "__main__":
             dsets = all_dsets
         else:
             dsets = [sys.argv[1]]
+        compressors = all_compressors
+    elif len(sys.argv) == 3:
+        if sys.argv[2] == "all":
+            compressors = all_compressors
+        else:
+            compressors = [sys.argv[2]]
     elif len(json_files) == 1:
         config_file = json_files[0]
         config = json.load(open(config_file, "r"))
         dsets = [config["dset"]]
+        compressors = all_compressors
     else:
         dsets = all_dsets
+        compressors = all_compressors
 
     print(
         f"Benchmarking:\n\tDatasets: {dsets}\n\tPreprocessing options: {list(preprocessing_options.keys())}"

@@ -413,14 +413,14 @@ if __name__ == "__main__":
                 print(f"\n\t\tElapsed time session: {elapsed_session}s")
 
             df = pd.read_csv(benchmark_file, index_col=False)
-            print(f"Final # entries in results for {strategy}: {len(df)}")
+            print(f"\n\tFinal # entries in results for {strategy}: {len(df)}")
 
             t_stop_strategy = time.perf_counter()
             elapsed_strategy = np.round(t_stop_strategy - t_start_strategy)
-            print(f"\n\tElapsed time strategy: {elapsed_strategy}s")
+            print(f"\tElapsed time strategy: {elapsed_strategy}s")
         t_stop_dset = time.perf_counter()
         elapsed_dset = np.round(t_stop_dset - t_start_dset)
-        print(f"\nElapsed time dataset: {elapsed_dset}s")
+        print(f"\nElapsed time dataset: {elapsed_dset}s\n")
 
     # aggregate pandas dataframes into one
     benchmark_file = results_folder / f"benchmark-lossy-exp.csv"

@@ -87,8 +87,8 @@ compressors = all_compressors
 levels = {
     "blosc": {"high": 9},
     "lzma": {"high": 9},
-    "flac": {"high": 8},
-    "wavpack": {"high": 3},
+    "flac": {"medium": 5},
+    "wavpack": {"medium": 2},
 }
 
 # define filters and shuffles
@@ -117,7 +117,7 @@ lsb_corrections = {
     "aind-np2": True,
     "aind-np1": True,
 }
-delta_filters = ["no", "1d", "2d-time", "2d-space", "2d-time-space"]
+delta_filters = ["1d", "2d-time", "2d-space", "2d-time-space"]
 
 subset_columns = [
     "session",
@@ -136,11 +136,13 @@ if __name__ == "__main__":
     json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
     subsessions = None
 
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 2:
         if sys.argv[1] == "all":
             dsets = all_dsets
         else:
             dsets = [sys.argv[1]]
+        compressors = all_compressors
+    elif len(sys.argv) == 3:
         if sys.argv[2] == "all":
             compressors = all_compressors
         else:
@@ -154,7 +156,7 @@ if __name__ == "__main__":
         dsets = all_dsets
         compressors = all_compressors
 
-    print(f"Benchmarking:\n\tDatasets: {dsets}\n\Delta filters: {delta_filters}\n\tCompressors: {compressors}")
+    print(f"Benchmarking:\n\tDatasets: {dsets}\n\tDelta filters: {delta_filters}\n\tCompressors: {compressors}")
 
     ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
