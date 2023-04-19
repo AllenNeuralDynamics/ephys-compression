@@ -117,7 +117,6 @@ lsb_corrections = {
 }
 
 preprocessing_options = {
-    "none": dict(preprocess_fun=None, preprocess_params=None),
     "highpass_300": dict(preprocess_fun=spre.highpass_filter, preprocess_params={"freq_min": 300}),
     "bandpass_300-6000": dict(
         preprocess_fun=spre.bandpass_filter,
@@ -127,6 +126,10 @@ preprocessing_options = {
         preprocess_fun=spre.bandpass_filter,
         preprocess_params={"freq_min": 500, "freq_max": 14999},
     ),
+    "anit-aliasing": dict(
+        preprocess_fun=spre.bandpass_filter,
+        preprocess_params={"freq_min": 0.5, "freq_max": 14999},
+    )
 }
 
 subset_columns = [
