@@ -143,6 +143,10 @@ if __name__ == "__main__":
             dsets = [sys.argv[1]]
         compressors = all_compressors
     elif len(sys.argv) == 3:
+        if sys.argv[1] == "all":
+            dsets = all_dsets
+        else:
+            dsets = [sys.argv[1]]
         if sys.argv[2] == "all":
             compressors = all_compressors
         else:
