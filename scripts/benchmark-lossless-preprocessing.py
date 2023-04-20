@@ -126,7 +126,7 @@ preprocessing_options = {
         preprocess_fun=spre.bandpass_filter,
         preprocess_params={"freq_min": 500, "freq_max": 14999},
     ),
-    "anit-aliasing": dict(
+    "anti-aliasing": dict(
         preprocess_fun=spre.bandpass_filter,
         preprocess_params={"freq_min": 0.5, "freq_max": 14999},
     )
