@@ -69,7 +69,10 @@ sessions = {
         "625749_2022-08-03_15-15-06_ProbeA",
         "634568_2022-08-05_15-59-46_ProbeA",
     ],
-    "ibl-np1": ["CSHZAD026_2020-09-04_probe00", "SWC054_2020-10-05_probe00"],
+    "ibl-np1": [
+        "CSHZAD026_2020-09-04_probe00",
+        "SWC054_2020-10-05_probe00"
+    ],
 }
 
 # auto curation
@@ -127,7 +130,7 @@ if __name__ == "__main__":
     # check if json files in data
     json_files = [p for p in data_folder.iterdir() if p.suffix == ".json"]
 
-    if len(sys.argv) == 6:
+    if len(sys.argv) == 5:
         if sys.argv[1] == "all":
             dsets = all_dsets
         else:
@@ -148,10 +151,6 @@ if __name__ == "__main__":
             num_runs = 1
         else:
             num_runs = int(sys.argv[4])
-        if sys.argv[5] == "false":
-            save_recordings = False
-        else:
-            save_recordings = True
     elif len(json_files) == 1:
         config_file = json_files[0]
         config = json.load(open(config_file, "r"))
@@ -159,13 +158,11 @@ if __name__ == "__main__":
         strategies = [config["strategy"]]
         factors = [0, config["factor"]]
         num_runs = config.get("num_runs", 1)
-        save_recordings = config.get("save_recordings", False)
     else:
         dsets = all_dsets
         strategies = all_strategies
         factors = None
         num_runs = 2
-        save_recordings = False
 
     ephys_benchmark_folders = [p for p in data_folder.iterdir() if p.is_dir() and "compression-benchmark" in p.name]
     if len(ephys_benchmark_folders) != 1:
@@ -180,18 +177,12 @@ if __name__ == "__main__":
     print(f"\tStrategies: {strategies}")
     print(f"\tFactors: {factors if factors is not None else 'all'}")
     print(f"\tNum runs: {num_runs}")
-    print(f"\tSave recordings: {save_recordings}")
 
     tmp_folder = scratch_folder / "tmp"
     if tmp_folder.is_dir():
         shutil.rmtree(tmp_folder)
     tmp_folder.mkdir()
-
-    if not save_recordings:
-        recordings_folder = tmp_folder
-    else:
-        recordings_folder = results_folder / "recordings"
-    recordings_folder.mkdir(exist_ok=True, parents=True)
+    recordings_folder = tmp_folder
 
     sorting_outputs_folder = results_folder / "sortings"
     raw_sorting_outputs_folder = sorting_outputs_folder / "raw"
@@ -287,11 +278,6 @@ if __name__ == "__main__":
                         )
                         print(f"\t\t\tCompression: cspeed xrt - {cspeed_xrt} - CR: {cr} - rmse: {rmse}\n")
 
-                        if save_recordings:
-                            zarr_path_save = str(zarr_path.relative_to(results_folder))
-                        else:
-                            zarr_path_save = "none"
-
                         # save snippet for visualization
                         rec_slice = rec.frame_slice(
                             start_frame=int(compress_range[0] * fs), end_frame=int(compress_range[1] * fs)
@@ -319,7 +305,6 @@ if __name__ == "__main__":
                             "CR": cr,
                             "cspeed_xrt": cspeed_xrt,
                             "rmse": rmse,
-                            "rec_zarr_path": str(zarr_path_save),
                             "rec_zarr_path_slice": str(zarr_path_slice.relative_to(results_folder)),
                         }
 
