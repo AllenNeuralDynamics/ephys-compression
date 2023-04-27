@@ -27,14 +27,16 @@ import spikeinterface as si
 import spikeinterface.preprocessing as spre
 from numcodecs import Blosc, Shuffle
 
+from delta2D_numcodecs import Delta2D
+from flac_numcodecs import Flac
+from wavpack_numcodecs import WavPack
+
 # add utils to path
 this_folder = Path(__file__).parent
 sys.path.append(str(this_folder.parent))
 
-from delta2D_numcodecs import Delta2D
-from flac_numcodecs import Flac
-from utils import append_to_csv, gs_download_folder, is_entry
-from wavpack_numcodecs import WavPack
+from utils import append_to_csv, is_entry
+
 
 overwrite = False
 

@@ -18,9 +18,6 @@ To ensure a fair comparison in terms of compression time (not affected by how th
 all data are loaded and saved to binary by SI.
 
 The final datasets are uploaded in the "s3://aind-ephys-compression-benchmark-data".
-
-
-** mindscope data is preprocessed, so it will not be used for benchmarking
 """
 import shutil
 import sys
@@ -294,65 +291,3 @@ for session, session_path in ibl_sessions.items():
             print(recording)
     else:
         print(f"{dataset}/{session} already in remote bucket")
-
-
-# # ### MINDSCOPE (AWS)
-# print("\n\n\nMINDSCOPE\n\n\n")
-# s3_bucket_mindscope = 'allen-brain-observatory'
-# region_name_mindscope = 'us-west-2'
-# prefix = 'visual-coding-neuropixels/raw-data'
-# dataset = "mindscope-np1"
-
-# mindscope_sessions = {
-#     "754312389_756781559": "754312389/756781559/spike_band.dat",
-#     "766640955_773592324": "766640955/773592324/spike_band.dat",
-#     "797828357_805579745": "797828357/805579745/spike_band.dat",
-#     "829720705_832129157": "829720705/832129157/spike_band.dat"
-# }
-
-# binary_dict = dict(num_chan=384, sampling_frequency=30000, dtype="int16", gain_to_uV=0.195, offset_to_uV=0)
-
-# for session, session_path in mindscope_sessions.items():
-#     print(session)
-
-#     session_folder = output_folder / dataset / session
-#     remote_location = f"{compression_bucket_path}/{dataset}/{session}"
-
-#     process_and_upload_session = False
-#     if f"{compression_bucket_path}/{dataset}" not in fs.ls(f"{compression_bucket_path}"):
-#         process_and_upload_session = True
-#     elif remote_location not in fs.ls(f"{compression_bucket_path}/{dataset}"):
-#         process_and_upload_session = True
-
-#     if process_and_upload_session:
-#         if not session_folder.is_dir():
-#             dest = tmp_folder / dataset
-#             dat_file_name = session_path.split("/")[-1]
-#             dest_file = dest / session / dat_file_name
-#             if not dest_file.is_file():
-#                 s3_download_public_file(f"{prefix}/{session_path}", dest,
-#                                         s3_bucket_mindscope, region_name_mindscope)
-
-#             recording = si.read_binary(dest_file, **binary_dict)
-#             print(recording)
-
-#             # load NP1 probe config probe and save
-#             probegroup = pi.read_probeinterface(ephys_compression_folder_path / "probes" / "NP1_tip_config.json")
-#             recording = recording.set_probegroup(probegroup)
-
-#             # save output to binary
-#             recording.save(folder=session_folder, **job_kwargs)
-
-#             upload_function(compression_bucket, f"{dataset}/{session_folder.name}", session_folder)
-
-#             if delete_tmp_files_as_created:
-#                 print(f"Deleting tmp folder {dest_file.parent}")
-#                 shutil.rmtree(dest_file.parent)
-#                 print(f"Deleting SI folder {session_folder}")
-#                 shutil.rmtree(session_folder)
-#         else:
-#             print(f"Loading binary")
-#             recording = si.load_extractor(session_folder)
-#             print(recording)
-#     else:
-#         print(f"{dataset}/{session} already in remote bucket")
